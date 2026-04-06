@@ -35,9 +35,5 @@ services:
       - key: RESEND_API_KEY
         sync: false
       
-      # App Configuration
-      - key: APP_URL
-        value: "https://sakina.hallvorn.com"
-    
     domains:
       - sakina.hallvorn.com
