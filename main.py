@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from groq import Groq
 from supabase import create_client, Client
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -30,8 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve static files (your HTML, CSS, JS)
-# Make sure you have a "static" folder next to main.py
+# Serve static files — index.html lives in ./static/
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
@@ -116,14 +115,14 @@ def verify_passcode(p: str, h: str) -> bool:
 
 
 def safe_user(user: dict) -> dict:
-    """Remove passcode_hash before sending user data to the frontend. NEVER skip this."""
+    """Strip passcode_hash before sending user data to frontend. Never skip this."""
     return {k: v for k, v in user.items() if k != "passcode_hash"}
 
 
 # ── User Functions ─────────────────────────────────────────────────────────────
 def register_user(email: str, passcode: str, full_name: str):
-    email = email.strip().lower()
-    passcode = passcode.strip()
+    email     = email.strip().lower()
+    passcode  = passcode.strip()
     full_name = full_name.strip()
 
     if not email or "@" not in email:
@@ -142,11 +141,11 @@ def register_user(email: str, passcode: str, full_name: str):
 
     try:
         supabase.table("sakina_users").insert({
-            "email": email,
+            "email":        email,
             "passcode_hash": hash_passcode(passcode),
-            "full_name": full_name,
-            "sakina_id": generate_sakina_id(),
-            "is_verified": True,
+            "full_name":    full_name,
+            "sakina_id":    generate_sakina_id(),
+            "is_verified":  True,
         }).execute()
         return True, f"Account created. Welcome, {full_name}."
     except Exception as e:
@@ -155,7 +154,7 @@ def register_user(email: str, passcode: str, full_name: str):
 
 
 def login_user(email: str, passcode: str):
-    email = email.strip().lower()
+    email    = email.strip().lower()
     passcode = passcode.strip()
 
     if not email or not passcode:
@@ -187,7 +186,7 @@ def update_user_profile(user_id: str, new_name: str = None, new_passcode: str = 
         r = supabase.table("sakina_users").select("*").eq("id", user_id).maybe_single().execute()
         if not r or not r.data:
             return False, "User not found."
-        user = r.data
+        user    = r.data
         updates = {}
 
         if new_name and new_name.strip():
@@ -214,12 +213,12 @@ def update_user_profile(user_id: str, new_name: str = None, new_passcode: str = 
 def save_conversation(user_id: str, session_id: str, chat_name: str, user_message: str, sakina_response: str):
     try:
         supabase.table("sakina_conversations").insert({
-            "user_id": user_id,
-            "session_id": session_id,
-            "chat_name": chat_name,
-            "user_message": user_message,
+            "user_id":         user_id,
+            "session_id":      session_id,
+            "chat_name":       chat_name,
+            "user_message":    user_message,
             "sakina_response": sakina_response,
-            "model_used": "llama-3.3-70b-versatile",
+            "model_used":      "llama-3.3-70b-versatile",
         }).execute()
     except Exception as e:
         print(f"[Save error] {e}")
@@ -253,12 +252,25 @@ def load_sessions_for_user(user_id: str):
             if sid not in seen:
                 seen[sid] = {
                     "session_id": sid,
-                    "chat_name": row.get("chat_name") or "Untitled",
+                    "chat_name":  row.get("chat_name") or "Untitled",
                     "created_at": row["created_at"],
                 }
         return list(seen.values())
     except Exception:
         return []
+
+
+def load_session_message_count(user_id: str, session_id: str) -> int:
+    """Return how many messages are in a session (for sidebar display)."""
+    try:
+        r = (supabase.table("sakina_conversations")
+             .select("id", count="exact")
+             .eq("user_id", user_id)
+             .eq("session_id", session_id)
+             .execute())
+        return r.count if r and r.count else 0
+    except Exception:
+        return 0
 
 
 def get_session_chat_name(user_id: str, session_id: str) -> str:
@@ -290,13 +302,30 @@ def generate_chat_name(msg: str) -> str:
     return name or "STEM Conversation"
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
+def build_messages(history: list, message: str) -> list:
+    """Build the Groq messages array from history + new message."""
+    msgs = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for turn in history:
+        if isinstance(turn, (list, tuple)) and len(turn) == 2:
+            if turn[0]:
+                msgs.append({"role": "user",      "content": str(turn[0])})
+            if turn[1]:
+                msgs.append({"role": "assistant", "content": str(turn[1])})
+    msgs.append({"role": "user", "content": message})
+    return msgs
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ROUTES
+# ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/")
 async def root():
     """Serve the main frontend HTML file."""
     return FileResponse("static/index.html")
 
+
+# ── Auth ───────────────────────────────────────────────────────────────────────
 
 @app.post("/api/register")
 async def api_register(req: Request):
@@ -306,11 +335,11 @@ async def api_register(req: Request):
     except Exception:
         return JSONResponse({"ok": False, "msg": "Invalid request body."}, status_code=400)
 
-    email     = body.get("email", "")
-    passcode  = body.get("passcode", "")
-    full_name = body.get("full_name", "")
-
-    ok, msg = register_user(email, passcode, full_name)
+    ok, msg = register_user(
+        body.get("email", ""),
+        body.get("passcode", ""),
+        body.get("full_name", ""),
+    )
     return JSONResponse({"ok": ok, "msg": msg})
 
 
@@ -322,10 +351,7 @@ async def api_login(req: Request):
     except Exception:
         return JSONResponse({"ok": False, "msg": "Invalid request body."}, status_code=400)
 
-    email    = body.get("email", "")
-    passcode = body.get("passcode", "")
-
-    user, msg = login_user(email, passcode)
+    user, msg = login_user(body.get("email", ""), body.get("passcode", ""))
     if user:
         return JSONResponse({"ok": True, "msg": msg, "user": safe_user(user)})
     return JSONResponse({"ok": False, "msg": msg})
@@ -333,7 +359,7 @@ async def api_login(req: Request):
 
 @app.post("/api/autologin")
 async def api_autologin(req: Request):
-    """Restore session from a stored user_id (localStorage). Returns safe user object."""
+    """Restore session from stored user_id (localStorage). Returns safe user object."""
     try:
         body = await req.json()
     except Exception:
@@ -349,19 +375,13 @@ async def api_autologin(req: Request):
     return JSONResponse({"ok": False})
 
 
+# ── Chat (standard — kept for fallback) ───────────────────────────────────────
+
 @app.post("/api/chat")
 async def api_chat(req: Request):
     """
-    Send a message to Sakina and get a reply.
-
-    Expected body:
-    {
-        "user_id":    string,
-        "session_id": string,
-        "message":    string,
-        "history":    [[user_msg, bot_reply], ...],   <- full conversation so far
-        "chat_name":  string                          <- current name or empty string
-    }
+    Non-streaming chat. Returns the full reply at once.
+    Body: { user_id, session_id, message, history, chat_name }
     """
     try:
         body = await req.json()
@@ -379,24 +399,13 @@ async def api_chat(req: Request):
     if not message:
         return JSONResponse({"ok": False, "msg": "Message is empty."}, status_code=400)
 
-    # Generate a chat name from the first message if we don't have one yet
     if not chat_name or chat_name in ("New Conversation", ""):
         chat_name = generate_chat_name(message)
 
-    # Build the messages array for Groq
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    for turn in history:
-        if isinstance(turn, (list, tuple)) and len(turn) == 2:
-            if turn[0]:
-                messages.append({"role": "user",      "content": str(turn[0])})
-            if turn[1]:
-                messages.append({"role": "assistant", "content": str(turn[1])})
-    messages.append({"role": "user", "content": message})
-
     try:
-        resp = groq_client.chat.completions.create(
+        resp  = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=messages,
+            messages=build_messages(history, message),
             max_tokens=2048,
             temperature=0.7,
             top_p=0.9,
@@ -406,11 +415,93 @@ async def api_chat(req: Request):
         print(f"[Groq error] {e}")
         return JSONResponse({"ok": False, "msg": f"AI error: {str(e)}"}, status_code=500)
 
-    # Persist to Supabase
     save_conversation(user_id, session_id, chat_name, message, reply)
-
     return JSONResponse({"ok": True, "reply": reply, "chat_name": chat_name})
 
+
+# ── Chat (streaming — primary) ─────────────────────────────────────────────────
+
+@app.post("/api/chat/stream")
+async def api_chat_stream(req: Request):
+    """
+    Streaming chat using Server-Sent Events (SSE).
+    The frontend reads chunks as they arrive so words appear in real time.
+
+    SSE format — each line the client receives:
+      data: <chunk of text>        <- a piece of the reply
+      data: [DONE]                 <- stream finished
+      data: [NAME]:<chat_name>     <- the generated chat name
+      data: [ERROR]:<message>      <- something went wrong
+
+    Body: { user_id, session_id, message, history, chat_name }
+    """
+    try:
+        body = await req.json()
+    except Exception:
+        async def err():
+            yield "data: [ERROR]:Invalid request body.\n\n"
+        return StreamingResponse(err(), media_type="text/event-stream")
+
+    user_id    = body.get("user_id", "")
+    session_id = body.get("session_id", "")
+    message    = (body.get("message") or "").strip()
+    history    = body.get("history", [])
+    chat_name  = body.get("chat_name", "")
+
+    if not user_id or not message:
+        async def err():
+            yield "data: [ERROR]:Missing user_id or message.\n\n"
+        return StreamingResponse(err(), media_type="text/event-stream")
+
+    if not chat_name or chat_name in ("New Conversation", ""):
+        chat_name = generate_chat_name(message)
+
+    async def generate():
+        full_reply = []
+        try:
+            # Send the chat name first so the frontend can update the header immediately
+            yield f"data: [NAME]:{chat_name}\n\n"
+
+            stream = groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=build_messages(history, message),
+                max_tokens=2048,
+                temperature=0.7,
+                top_p=0.9,
+                stream=True,          # <-- this is the key change vs /api/chat
+            )
+
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    full_reply.append(delta)
+                    # Escape newlines so SSE stays on one line per event
+                    safe = delta.replace("\n", "\\n")
+                    yield f"data: {safe}\n\n"
+
+            # Signal completion
+            yield "data: [DONE]\n\n"
+
+            # Persist the full assembled reply to Supabase
+            complete_reply = "".join(full_reply)
+            save_conversation(user_id, session_id, chat_name, message, complete_reply)
+
+        except Exception as e:
+            print(f"[Stream error] {e}")
+            yield f"data: [ERROR]:{str(e)}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control":               "no-cache",
+            "X-Accel-Buffering":           "no",   # important for nginx/render proxies
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
+# ── Sessions ───────────────────────────────────────────────────────────────────
 
 @app.get("/api/sessions/{user_id}")
 async def api_sessions(user_id: str):
@@ -424,7 +515,7 @@ async def api_sessions(user_id: str):
 
 @app.get("/api/session/{user_id}/{session_id}")
 async def api_session_history(user_id: str, session_id: str):
-    """Load the full message history of a specific session."""
+    """Load full message history of a specific session."""
     if not user_id or not session_id:
         return JSONResponse({"ok": False, "msg": "Missing parameters."}, status_code=400)
 
@@ -433,48 +524,55 @@ async def api_session_history(user_id: str, session_id: str):
     return JSONResponse({"ok": True, "history": history, "chat_name": chat_name})
 
 
+@app.delete("/api/session/{user_id}/{session_id}")
+async def api_delete_session(user_id: str, session_id: str):
+    """Delete all messages in a session."""
+    if not user_id or not session_id:
+        return JSONResponse({"ok": False, "msg": "Missing parameters."}, status_code=400)
+    try:
+        supabase.table("sakina_conversations") \
+            .delete() \
+            .eq("user_id", user_id) \
+            .eq("session_id", session_id) \
+            .execute()
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        print(f"[Delete session error] {e}")
+        return JSONResponse({"ok": False, "msg": "Delete failed."}, status_code=500)
+
+
+# ── Profile ────────────────────────────────────────────────────────────────────
+
 @app.post("/api/update_profile")
 async def api_update_profile(req: Request):
     """
     Update name or passcode.
-
-    Expected body:
-    {
-        "user_id":          string,
-        "new_name":         string  (optional),
-        "new_passcode":     string  (optional),
-        "current_passcode": string  (required if changing passcode)
-    }
+    Body: { user_id, new_name?, new_passcode?, current_passcode? }
     """
     try:
         body = await req.json()
     except Exception:
         return JSONResponse({"ok": False, "msg": "Invalid request body."}, status_code=400)
 
-    user_id          = body.get("user_id", "")
-    new_name         = body.get("new_name")
-    new_passcode     = body.get("new_passcode")
-    current_passcode = body.get("current_passcode")
-
+    user_id = body.get("user_id", "")
     if not user_id:
         return JSONResponse({"ok": False, "msg": "Not authenticated."}, status_code=401)
 
     ok, msg = update_user_profile(
         user_id,
-        new_name=new_name,
-        new_passcode=new_passcode,
-        current_passcode=current_passcode,
+        new_name=body.get("new_name"),
+        new_passcode=body.get("new_passcode"),
+        current_passcode=body.get("current_passcode"),
     )
 
-    # If name changed successfully, return the new name so the frontend can update
-    updated_name = new_name.strip() if (ok and new_name) else None
+    updated_name = body.get("new_name", "").strip() if ok and body.get("new_name") else None
     return JSONResponse({"ok": ok, "msg": msg, "updated_name": updated_name})
 
 
-# ── Health Check ───────────────────────────────────────────────────────────────
+# ── Health ─────────────────────────────────────────────────────────────────────
+
 @app.get("/health")
 async def health():
-    """Simple health check endpoint."""
     return JSONResponse({"status": "ok", "service": "Sakina — Hallvorn"})
 
 
