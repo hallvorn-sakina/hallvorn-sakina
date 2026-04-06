@@ -1,4 +1,6 @@
-gradio==5.23.0
+fastapi
+uvicorn
+python-multipart
 groq
 supabase
 bcrypt
