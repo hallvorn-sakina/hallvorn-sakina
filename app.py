@@ -181,7 +181,6 @@ def load_all_history(user_id):
         return []
 
 def get_chat_sessions(user_id):
-    """Get unique chat sessions with their names and last message time."""
     try:
         result = (
             supabase.table("sakina_conversations")
@@ -208,19 +207,16 @@ def get_chat_sessions(user_id):
         return []
 
 def generate_chat_name(first_message: str) -> str:
-    """Generate a smart chat name from the first message."""
     msg = first_message.strip()
-    # Remove question words and clean up
     for word in ["what is ", "what are ", "explain ", "how does ", "why is ", "tell me about ", "describe "]:
         if msg.lower().startswith(word):
             msg = msg[len(word):]
             break
-    # Capitalize and truncate
     name = msg[:40].strip()
     if name:
         name = name[0].upper() + name[1:]
         if not name.endswith("?"):
-            name = name.rstrip("?.,!") 
+            name = name.rstrip("?.,!")
     return name or "STEM Conversation"
 
 # ── Chat ──────────────────────────────────────────────────────────────────────
@@ -229,8 +225,7 @@ def chat(message, history, session_id, user_state, chat_name_state):
         return "Please sign in to chat with Sakina.", chat_name_state
     if not message or not message.strip():
         return "", chat_name_state
-    
-    # Generate chat name from first message
+
     current_name = chat_name_state
     if not current_name or current_name == "New Chat":
         current_name = generate_chat_name(message)
@@ -278,8 +273,7 @@ def build_user_bar(profile: dict, chat_name: str = "New Chat") -> str:
 def build_history_html(conversations: list) -> str:
     if not conversations:
         return """<div class="empty-state">No conversations yet.<br>Ask Sakina something to get started.</div>"""
-    
-    # Group by session
+
     sessions = {}
     for item in conversations:
         sid = item.get("session_id", "unknown")
@@ -295,6 +289,7 @@ def build_history_html(conversations: list) -> str:
     for sid, session in sessions.items():
         count = len(session["messages"])
         preview = session["messages"][-1].get("user_message", "")[:80] + "..." if session["messages"] else ""
+        # Each session card has a "Continue" button that sends the session_id back via JS
         html += f"""
         <div class='session-card'>
             <div class='session-header'>
@@ -313,7 +308,11 @@ def build_history_html(conversations: list) -> str:
             </div>"""
         if len(session["messages"]) > 3:
             html += f"<div class='msg-more'>+{len(session['messages'])-3} more messages in this chat</div>"
-        html += "</div></div>"
+        html += f"""</div>
+            <button class='continue-btn' onclick="document.getElementById('resume-session-input').value='{sid}'; document.getElementById('resume-session-btn').click();">
+                ↩ Continue this chat
+            </button>
+        </div>"""
     html += "</div>"
     return html
 
@@ -327,66 +326,104 @@ CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,300;0,400;1,300&family=Space+Mono:wght@400;700&display=swap');
 
 :root {
-    --void:    #050505;
+    --void:    #050508;
     --pearl:   #EEEEFF;
     --deep:    #0D0D2B;
     --pulse:   #7B2FFF;
     --arc:     #00D4FF;
     --current: #1A6BFF;
     --fault:   #FF1A1A;
+    --warn:    #FFB800;
     --font-display:   'Orbitron', sans-serif;
     --font-interface: 'DM Sans', sans-serif;
     --font-reading:   'Source Serif 4', serif;
     --font-mono:      'Space Mono', monospace;
 }
 
-*, *::before, *::after { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-body, .gradio-container {
+/* ── Full-page takeover ── */
+html, body {
+    width: 100% !important;
+    min-height: 100vh !important;
     background: var(--void) !important;
+    background-image:
+        radial-gradient(ellipse 80% 50% at 20% 10%, rgba(123,47,255,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 90%, rgba(0,212,255,0.05) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(26,107,255,0.04) 0%, transparent 70%);
+    background-attachment: fixed;
+}
+
+/* Override ALL gradio container constraints */
+.gradio-container,
+.gradio-container > *,
+.contain,
+#root,
+.app {
+    max-width: 100% !important;
+    width: 100% !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
     font-family: var(--font-interface) !important;
     color: var(--pearl) !important;
-    min-height: 100vh;
 }
-.gradio-container { max-width: 900px !important; margin: 0 auto !important; padding: 0 !important; }
+
+/* Remove gradio default white bg panels */
+.gradio-container .prose,
+.gradio-container .wrap,
+footer,
+.gradio-container > .main > .wrap {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Hide gradio footer */
+footer { display: none !important; }
+
+/* Main content wrapper */
+.sakina-app-wrapper {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1rem;
+    width: 100%;
+}
 
 /* ── Header ── */
 .sakina-header {
     text-align: center;
-    padding: 3rem 1rem 2rem;
+    padding: clamp(2rem, 5vw, 4rem) 1rem clamp(1.5rem, 3vw, 2.5rem);
     position: relative;
-    border-bottom: 1px solid rgba(123,47,255,0.2);
-    margin-bottom: 0;
     overflow: hidden;
-}
-.sakina-header::before {
-    content: '';
-    position: absolute; top: -80px; left: 50%; transform: translateX(-50%);
-    width: 600px; height: 300px;
-    background: radial-gradient(ellipse, rgba(123,47,255,0.12) 0%, transparent 70%);
-    pointer-events: none;
 }
 .sakina-header::after {
     content: '';
-    position: absolute; bottom: 0; left: 10%; right: 10%;
+    position: absolute; bottom: 0; left: 5%; right: 5%;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.4), transparent);
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.3), rgba(123,47,255,0.3), transparent);
 }
 .sakina-logo {
     font-family: var(--font-display);
-    font-size: clamp(1.8rem, 5vw, 3.2rem);
+    font-size: clamp(1.6rem, 6vw, 3.4rem);
     font-weight: 900;
-    letter-spacing: 4px;
+    letter-spacing: clamp(2px, 1vw, 6px);
     text-transform: uppercase;
     background: linear-gradient(135deg, #818cf8 0%, #c084fc 40%, var(--arc) 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     line-height: 1; margin-bottom: 0.6rem;
+    animation: logoGlow 3s ease-in-out infinite alternate;
+}
+@keyframes logoGlow {
+    from { filter: drop-shadow(0 0 20px rgba(123,47,255,0.2)); }
+    to   { filter: drop-shadow(0 0 40px rgba(0,212,255,0.3)); }
 }
 .sakina-tagline {
     font-family: var(--font-reading);
     font-style: italic;
     color: rgba(238,238,255,0.4);
-    font-size: 0.95rem;
+    font-size: clamp(0.78rem, 2vw, 1rem);
     letter-spacing: 0.5px;
     margin-bottom: 1rem;
 }
@@ -395,31 +432,73 @@ body, .gradio-container {
 }
 .badge {
     font-family: var(--font-mono);
-    font-size: 0.62rem;
+    font-size: clamp(0.55rem, 1.2vw, 0.65rem);
     letter-spacing: 1.5px;
     text-transform: uppercase;
-    padding: 3px 10px;
+    padding: 4px 12px;
     border-radius: 20px;
 }
 .badge-pulse { background: rgba(123,47,255,0.12); border: 1px solid rgba(123,47,255,0.3); color: #a78bfa; }
 .badge-arc   { background: rgba(0,212,255,0.08);  border: 1px solid rgba(0,212,255,0.2);  color: var(--arc); }
 .badge-mono  { background: rgba(238,238,255,0.04); border: 1px solid rgba(238,238,255,0.1); color: rgba(238,238,255,0.3); }
 
-/* ── Auth ── */
+/* ── Email verification notice ── */
+.email-verify-notice {
+    background: linear-gradient(135deg, rgba(255,184,0,0.06), rgba(255,184,0,0.02));
+    border: 1px solid rgba(255,184,0,0.25);
+    border-left: 3px solid var(--warn);
+    border-radius: 10px;
+    padding: 0.85rem 1.1rem;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+.email-verify-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.email-verify-text {
+    font-family: var(--font-interface);
+    font-size: 0.82rem;
+    color: rgba(255,184,0,0.85);
+    line-height: 1.55;
+}
+.email-verify-text strong {
+    color: var(--warn);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 0.78rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+}
+
+/* ── Auth panel ── */
 .auth-panel {
-    background: var(--deep);
+    background: rgba(13,13,43,0.7);
     border: 1px solid rgba(123,47,255,0.2);
     border-radius: 20px;
-    padding: 2.5rem 2rem;
-    margin: 1.5rem 1rem;
+    padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.25rem, 4vw, 2.25rem);
+    margin: 1rem auto;
+    max-width: 520px;
+    width: 100%;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(123,47,255,0.05);
+    animation: panelIn 0.5s ease-out;
+}
+@keyframes panelIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 .auth-heading {
     font-family: var(--font-display);
-    font-size: 1.1rem;
+    font-size: clamp(0.85rem, 2vw, 1.1rem);
     font-weight: 700;
     letter-spacing: 2px;
     color: var(--pearl);
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.3rem;
     text-transform: uppercase;
 }
 .auth-sub {
@@ -428,7 +507,7 @@ body, .gradio-container {
     color: rgba(238,238,255,0.35);
     font-size: 0.88rem;
     line-height: 1.6;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.25rem;
 }
 
 /* ── User bar ── */
@@ -436,21 +515,22 @@ body, .gradio-container {
     display: flex;
     align-items: center;
     gap: 0.85rem;
-    background: var(--deep);
+    background: rgba(13,13,43,0.6);
     border: 1px solid rgba(123,47,255,0.2);
     border-radius: 14px;
-    padding: 0.9rem 1.25rem;
+    padding: 0.8rem 1.1rem;
     margin: 0 0 0.75rem;
+    flex-wrap: wrap;
 }
 .user-avatar {
-    width: 42px; height: 42px; border-radius: 50%;
+    width: 40px; height: 40px; border-radius: 50%;
     background: linear-gradient(135deg, var(--pulse), var(--current));
     display: flex; align-items: center; justify-content: center;
     font-family: var(--font-display);
-    font-weight: 700; font-size: 1rem; color: white;
+    font-weight: 700; font-size: 0.95rem; color: white;
     flex-shrink: 0;
-    border: 2px solid rgba(123,47,255,0.5);
-    box-shadow: 0 0 16px rgba(123,47,255,0.25);
+    border: 2px solid rgba(123,47,255,0.4);
+    box-shadow: 0 0 14px rgba(123,47,255,0.2);
 }
 .user-name {
     font-family: var(--font-interface);
@@ -458,32 +538,37 @@ body, .gradio-container {
 }
 .user-email {
     font-family: var(--font-mono);
-    font-size: 0.68rem; color: rgba(238,238,255,0.3); margin-top: 1px;
+    font-size: 0.65rem; color: rgba(238,238,255,0.3); margin-top: 1px;
 }
 .user-skn {
     font-family: var(--font-mono);
-    font-size: 0.6rem; color: #a78bfa;
+    font-size: 0.58rem; color: #a78bfa;
     margin-top: 2px; word-break: break-all;
     letter-spacing: 0.5px;
+    display: none; /* hidden on small screens, shown on hover/larger */
+}
+@media (min-width: 600px) {
+    .user-skn { display: block; }
 }
 .chat-name-badge {
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: 0.65rem;
     background: rgba(0,212,255,0.08);
     border: 1px solid rgba(0,212,255,0.2);
     color: var(--arc);
-    padding: 4px 12px;
+    padding: 4px 10px;
     border-radius: 20px;
     letter-spacing: 0.5px;
     white-space: nowrap;
-    max-width: 200px;
+    max-width: 180px;
     overflow: hidden;
     text-overflow: ellipsis;
+    margin-left: auto;
 }
 
 /* ── Inputs ── */
-textarea, input[type=text], input[type=password] {
-    background: var(--deep) !important;
+textarea, input[type=text], input[type=password], input[type=email] {
+    background: rgba(5,5,8,0.8) !important;
     border: 1px solid rgba(123,47,255,0.2) !important;
     border-radius: 12px !important;
     color: var(--pearl) !important;
@@ -493,19 +578,19 @@ textarea, input[type=text], input[type=password] {
 }
 textarea:focus, input:focus {
     border-color: var(--pulse) !important;
-    box-shadow: 0 0 0 2px rgba(123,47,255,0.12) !important;
+    box-shadow: 0 0 0 3px rgba(123,47,255,0.1) !important;
     outline: none !important;
 }
 label {
     color: rgba(238,238,255,0.35) !important;
     font-family: var(--font-mono) !important;
-    font-size: 0.72rem !important;
+    font-size: 0.68rem !important;
     letter-spacing: 1px !important;
     text-transform: uppercase !important;
 }
 
 /* ── Buttons ── */
-.gr-button-primary, button.primary, .gr-button-primary:hover {
+.gr-button-primary, button.primary {
     background: linear-gradient(135deg, var(--pulse), var(--current)) !important;
     border: none !important;
     border-radius: 10px !important;
@@ -513,11 +598,13 @@ label {
     font-family: var(--font-interface) !important;
     font-weight: 600 !important;
     letter-spacing: 0.3px !important;
-    transition: opacity 0.2s, transform 0.2s !important;
+    transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s !important;
+    box-shadow: 0 4px 20px rgba(123,47,255,0.2) !important;
 }
 .gr-button-primary:hover, button.primary:hover {
     opacity: 0.88 !important;
     transform: translateY(-1px) !important;
+    box-shadow: 0 6px 28px rgba(123,47,255,0.35) !important;
 }
 .gr-button-secondary, button.secondary {
     background: transparent !important;
@@ -532,6 +619,30 @@ label {
     color: var(--arc) !important;
 }
 
+/* ── Continue chat button ── */
+.continue-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 1rem;
+    padding: 7px 16px;
+    background: rgba(0,212,255,0.06);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 8px;
+    color: var(--arc);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    text-transform: uppercase;
+}
+.continue-btn:hover {
+    background: rgba(0,212,255,0.12);
+    border-color: rgba(0,212,255,0.4);
+    transform: translateY(-1px);
+}
+
 /* ── Chat bubbles ── */
 .message.user {
     background: rgba(26,107,255,0.08) !important;
@@ -541,7 +652,7 @@ label {
     font-family: var(--font-interface) !important;
 }
 .message.bot {
-    background: rgba(13,13,43,0.9) !important;
+    background: rgba(13,13,43,0.85) !important;
     border: 1px solid rgba(123,47,255,0.15) !important;
     border-radius: 18px 18px 18px 4px !important;
     color: var(--pearl) !important;
@@ -551,26 +662,43 @@ label {
 /* ── History ── */
 .history-container { display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem 0; }
 .session-card {
-    background: var(--deep);
-    border: 1px solid rgba(123,47,255,0.15);
+    background: rgba(13,13,43,0.6);
+    border: 1px solid rgba(123,47,255,0.12);
     border-radius: 16px;
-    padding: 1.25rem;
-    transition: border-color 0.2s;
+    padding: clamp(1rem, 3vw, 1.4rem);
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    animation: cardIn 0.4s ease-out;
 }
-.session-card:hover { border-color: rgba(0,212,255,0.3); }
-.session-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; gap: 1rem; }
+@keyframes cardIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.session-card:hover {
+    border-color: rgba(0,212,255,0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+}
+.session-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
 .session-name {
     font-family: var(--font-display);
-    font-size: 0.78rem;
+    font-size: clamp(0.65rem, 1.5vw, 0.78rem);
     font-weight: 600;
     letter-spacing: 1px;
     color: var(--arc);
     text-transform: uppercase;
     flex: 1;
+    min-width: 120px;
 }
 .session-meta {
     font-family: var(--font-mono);
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     color: rgba(238,238,255,0.2);
     white-space: nowrap;
 }
@@ -585,7 +713,7 @@ label {
 }
 .session-messages { display: flex; flex-direction: column; gap: 0.6rem; }
 .msg-pair {
-    background: rgba(5,5,5,0.5);
+    background: rgba(5,5,8,0.5);
     border: 1px solid rgba(238,238,255,0.04);
     border-radius: 10px;
     padding: 0.75rem;
@@ -593,19 +721,19 @@ label {
 .msg-q {
     font-family: var(--font-interface);
     font-weight: 500;
-    font-size: 0.82rem;
+    font-size: clamp(0.75rem, 2vw, 0.83rem);
     color: rgba(238,238,255,0.7);
     margin-bottom: 0.4rem;
 }
 .msg-a {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: clamp(0.65rem, 1.5vw, 0.72rem);
     color: rgba(238,238,255,0.3);
     line-height: 1.6;
 }
 .msg-more {
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: 0.65rem;
     color: rgba(123,47,255,0.5);
     text-align: center;
     padding: 0.4rem;
@@ -616,15 +744,15 @@ label {
     padding: 3rem 1rem;
     color: rgba(238,238,255,0.2);
     font-family: var(--font-mono);
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     letter-spacing: 0.5px;
-    line-height: 2;
+    line-height: 2.2;
 }
 
 /* ── Tabs ── */
 .tab-nav button {
     font-family: var(--font-mono) !important;
-    font-size: 0.72rem !important;
+    font-size: 0.68rem !important;
     letter-spacing: 1px !important;
     text-transform: uppercase !important;
     color: rgba(238,238,255,0.3) !important;
@@ -632,6 +760,7 @@ label {
     border: none !important;
     border-bottom: 2px solid transparent !important;
     transition: color 0.2s, border-color 0.2s !important;
+    padding: 8px 14px !important;
 }
 .tab-nav button.selected {
     color: var(--arc) !important;
@@ -641,13 +770,13 @@ label {
 /* ── Footer ── */
 .sakina-footer {
     text-align: center;
-    padding: 1.5rem 1rem 2.5rem;
-    border-top: 1px solid rgba(123,47,255,0.1);
-    margin-top: 1.5rem;
+    padding: 2rem 1rem 3rem;
+    border-top: 1px solid rgba(123,47,255,0.08);
+    margin-top: 2rem;
 }
 .footer-line1 {
     font-family: var(--font-mono);
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     letter-spacing: 2px;
     text-transform: uppercase;
     color: rgba(238,238,255,0.1);
@@ -655,20 +784,53 @@ label {
 .footer-line2 {
     font-family: var(--font-reading);
     font-style: italic;
-    font-size: 0.78rem;
-    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
     background: linear-gradient(135deg, #818cf8, var(--arc));
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: var(--void); }
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(123,47,255,0.3); border-radius: 3px; }
 
 /* ── Misc ── */
 .gr-form { background: transparent !important; }
 .gr-box { background: transparent !important; border: none !important; }
+
+/* ── Responsive overrides ── */
+@media (max-width: 600px) {
+    .user-bar { padding: 0.65rem 0.85rem; gap: 0.6rem; }
+    .chat-name-badge { max-width: 100px; font-size: 0.58rem; }
+    .auth-panel { border-radius: 16px; }
+    .session-card { padding: 0.85rem; }
+    .continue-btn { font-size: 0.65rem; padding: 6px 12px; }
+    .sakina-badges { gap: 0.35rem; }
+}
+@media (max-width: 400px) {
+    .chat-name-badge { display: none; }
+    .user-skn { display: none !important; }
+}
+
+/* ── Chatbot container fill ── */
+.chatbot-wrap { 
+    border: 1px solid rgba(123,47,255,0.15) !important;
+    border-radius: 16px !important;
+    background: rgba(5,5,8,0.5) !important;
+    overflow: hidden !important;
+}
+"""
+
+EMAIL_VERIFY_NOTICE = """
+<div class="email-verify-notice">
+    <div class="email-verify-icon">⚠️</div>
+    <div class="email-verify-text">
+        <strong>Coming Soon: Email Verification Required</strong>
+        In an upcoming version, all accounts will require email verification before activation.
+        Please use an email address you have full access to — you will need it to verify your account and recover access in the future.
+    </div>
+</div>
 """
 
 EXAMPLES = [
@@ -706,22 +868,26 @@ with gr.Blocks(css=CSS, title="Hallvorn Sakina") as demo:
 
     # ── Auth ──────────────────────────────────────────────────────────────
     with gr.Group(visible=True) as auth_panel:
-        gr.HTML("""
-        <div class="auth-panel">
-            <div class="auth-heading">Access Sakina</div>
-            <div class="auth-sub">
-                Your personal elite STEM intelligence by Hallvorn — inspired by a neurosurgeon,
-                engineered to reveal the science behind everything.
-            </div>
-        </div>
-        """)
         with gr.Tabs():
             with gr.Tab("Sign In"):
+                gr.HTML("""
+                <div class="auth-panel">
+                    <div class="auth-heading">Welcome Back</div>
+                    <div class="auth-sub">Sign in to continue your STEM journey with Sakina.</div>
+                </div>
+                """)
                 li_email = gr.Textbox(label="Email Address", placeholder="you@example.com")
                 li_pass  = gr.Textbox(label="Passcode", type="password", placeholder="Your passcode")
                 li_btn   = gr.Button("Sign In to Sakina", variant="primary", size="lg")
                 li_msg   = gr.HTML("")
+
             with gr.Tab("Create Account"):
+                gr.HTML("""
+                <div class="auth-panel">
+                    <div class="auth-heading">Join Sakina</div>
+                    <div class="auth-sub">Create your account and unlock elite STEM intelligence by Hallvorn.</div>
+                </div>
+                """ + EMAIL_VERIFY_NOTICE)
                 su_name  = gr.Textbox(label="Full Name", placeholder="Your full name")
                 su_email = gr.Textbox(label="Email Address", placeholder="you@example.com")
                 su_pass  = gr.Textbox(label="Passcode (min 6 chars)", type="password", placeholder="Choose a passcode")
@@ -733,11 +899,16 @@ with gr.Blocks(css=CSS, title="Hallvorn Sakina") as demo:
 
         user_bar_html = gr.HTML("")
 
-        with gr.Tabs():
+        # Hidden inputs for session resume (triggered by JS from history cards)
+        resume_session_input = gr.Textbox(visible=False, elem_id="resume-session-input")
+        resume_session_btn   = gr.Button("Resume", visible=False, elem_id="resume-session-btn")
+
+        with gr.Tabs() as main_tabs:
             with gr.Tab("Chat"):
                 chatbot = gr.Chatbot(
-                    value=[], height=520,
+                    value=[], height=500,
                     show_label=False,
+                    elem_classes=["chatbot-wrap"],
                     avatar_images=(
                         None,
                         "https://api.dicebear.com/7.x/bottts/svg?seed=sakina&backgroundColor=7B2FFF"
@@ -754,7 +925,7 @@ with gr.Blocks(css=CSS, title="Hallvorn Sakina") as demo:
                 gr.Examples(examples=EXAMPLES, inputs=msg_box, label="Try asking Sakina...")
 
             with gr.Tab("My Chats"):
-                ref_btn   = gr.Button("↻  Refresh", variant="secondary", size="sm")
+                ref_btn   = gr.Button("↻  Refresh History", variant="secondary", size="sm")
                 hist_html = gr.HTML("""<div class="empty-state">Your conversation history will appear here.<br>Start a chat to begin building your archive.</div>""")
 
         with gr.Row():
@@ -783,10 +954,10 @@ with gr.Blocks(css=CSS, title="Hallvorn Sakina") as demo:
         outputs=[auth_panel, chat_panel, li_msg, su_msg],
     )
 
-    def on_login(email, passcode, session_id):
+    def on_login(email, passcode, sid):
         user, text = login_user(email, passcode)
         if user:
-            history  = load_session_history(user["id"], session_id)
+            history  = load_session_history(user["id"], sid)
             bar      = build_user_bar(user, "New Chat")
             all_hist = load_all_history(user["id"])
             hist     = build_history_html(all_hist)
@@ -805,12 +976,12 @@ with gr.Blocks(css=CSS, title="Hallvorn Sakina") as demo:
         outputs=[auth_panel, chat_panel, li_msg, user_state, chatbot, user_bar_html, hist_html, chat_name_st],
     )
 
-    def on_send(message, history, session_id, user_state, chat_name):
+    def on_send(message, history, sid, user_st, chat_name):
         if not message or not message.strip():
             return history, "", chat_name, ""
-        reply, new_name = chat(message, history, session_id, user_state, chat_name)
+        reply, new_name = chat(message, history, sid, user_st, chat_name)
         new_history = history + [(message.strip(), reply)]
-        bar = build_user_bar(user_state, new_name) if user_state else ""
+        bar = build_user_bar(user_st, new_name) if user_st else ""
         return new_history, "", new_name, bar
 
     send_btn.click(
@@ -824,9 +995,9 @@ with gr.Blocks(css=CSS, title="Hallvorn Sakina") as demo:
         outputs=[chatbot, msg_box, chat_name_st, user_bar_html],
     )
 
-    def on_new_chat(user_state):
+    def on_new_chat(user_st):
         new_sid = str(uuid.uuid4())
-        bar = build_user_bar(user_state, "New Chat") if user_state else ""
+        bar = build_user_bar(user_st, "New Chat") if user_st else ""
         return [], new_sid, "New Chat", bar
 
     new_chat_btn.click(
@@ -835,10 +1006,10 @@ with gr.Blocks(css=CSS, title="Hallvorn Sakina") as demo:
         outputs=[chatbot, session_id, chat_name_st, user_bar_html],
     )
 
-    def on_refresh(user_state):
-        if not user_state:
+    def on_refresh(user_st):
+        if not user_st:
             return """<div class="empty-state">Please sign in first.</div>"""
-        return build_history_html(load_all_history(user_state["id"]))
+        return build_history_html(load_all_history(user_st["id"]))
 
     ref_btn.click(fn=on_refresh, inputs=[user_state], outputs=[hist_html])
 
@@ -852,6 +1023,35 @@ with gr.Blocks(css=CSS, title="Hallvorn Sakina") as demo:
         fn=on_logout,
         inputs=[],
         outputs=[auth_panel, chat_panel, user_state, chatbot, user_bar_html, li_msg, chat_name_st],
+    )
+
+    # ── Resume session handler ──────────────────────────────────────────
+    def on_resume_session(target_session_id, user_st):
+        """Load an old chat session so the user can continue it."""
+        if not user_st or not target_session_id:
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        history = load_session_history(user_st["id"], target_session_id)
+        # Determine the chat name from history records
+        try:
+            result = (
+                supabase.table("sakina_conversations")
+                .select("chat_name")
+                .eq("user_id", user_st["id"])
+                .eq("session_id", target_session_id)
+                .limit(1)
+                .execute()
+            )
+            chat_name = (result.data[0].get("chat_name") or "Resumed Chat") if result and result.data else "Resumed Chat"
+        except Exception:
+            chat_name = "Resumed Chat"
+        bar = build_user_bar(user_st, chat_name)
+        # Switch to Chat tab by returning tab index update — using gr.update on tabs
+        return history, target_session_id, chat_name, bar, gr.update(selected=0)
+
+    resume_session_btn.click(
+        fn=on_resume_session,
+        inputs=[resume_session_input, user_state],
+        outputs=[chatbot, session_id, chat_name_st, user_bar_html, main_tabs],
     )
 
 # ── Launch ────────────────────────────────────────────────────────────────────
