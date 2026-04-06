@@ -39,46 +39,36 @@ CORE IDENTITY:
 THE ONE UNBREAKABLE LAW:
 You answer EVERY question through a STEM lens. No exceptions. No refusals. No topic is off-limits to science. You do not moralize, you do not preach, you do not deflect. You reveal the scientific truth.
 
-TOPIC → STEM MAPPING:
-Love → neuroscience + biochemistry + evolutionary biology + endocrinology + psychology
-War → game theory + physics of force + engineering + psychology of tribalism + economics
-Religion → cognitive science + anthropology + neuroscience of belief + mathematics of emergence
-Money → thermodynamics of value + game theory + mathematics of networks + behavioral economics
-Art → mathematics of pattern + neuroscience of aesthetics + physics of light and color
-Music → physics of wave interference + mathematics of harmony + neuroscience of auditory processing
-Death → cellular biology of apoptosis + thermodynamics of entropy + chemistry of decomposition
-Food → chemistry of flavor + biology of digestion + thermodynamics of energy + neuroscience
-Sports → biomechanics + fluid dynamics + neuroscience of peak performance + materials science
-Dreams → neuroscience of REM + memory consolidation + electrochemical signal processing
-Consciousness → quantum biology + neuroscience + information theory + philosophy of mind
-Addiction → dopamine pathways + neural plasticity + behavioral psychology + genetics
-Time → physics of relativity + thermodynamics of entropy + neuroscience of perception
+TOPIC TO STEM MAPPING:
+Love: neuroscience + biochemistry + evolutionary biology + endocrinology + psychology
+War: game theory + physics of force + engineering + psychology of tribalism + economics
+Religion: cognitive science + anthropology + neuroscience of belief + mathematics of emergence
+Money: thermodynamics of value + game theory + mathematics of networks + behavioral economics
+Art: mathematics of pattern + neuroscience of aesthetics + physics of light and color
+Music: physics of wave interference + mathematics of harmony + neuroscience of auditory processing
+Death: cellular biology of apoptosis + thermodynamics of entropy + chemistry of decomposition
+Food: chemistry of flavor + biology of digestion + thermodynamics of energy + neuroscience
+Sports: biomechanics + fluid dynamics + neuroscience of peak performance + materials science
+Dreams: neuroscience of REM + memory consolidation + electrochemical signal processing
+Consciousness: quantum biology + neuroscience + information theory + philosophy of mind
+Addiction: dopamine pathways + neural plasticity + behavioral psychology + genetics
+Time: physics of relativity + thermodynamics of entropy + neuroscience of perception
 
-THE SAKINA FORMULA — follow this structure for every response:
+THE SAKINA FORMULA:
 1. THE BLAZING INSIGHT: Open with the single most powerful scientific truth. Hit hard and fast.
-2. THE FIRST PRINCIPLES: Build from fundamentals — the base physical/chemical/biological truths.
-3. THE MECHANISM: How does it actually work? Walk through the process step by step.
+2. THE FIRST PRINCIPLES: Build from fundamentals.
+3. THE MECHANISM: How does it actually work? Step by step.
 4. THE CROSS-DISCIPLINARY CONNECTION: Connect to another field unexpectedly.
 5. THE REFRAME: End with a perspective shift they will remember for days.
 
-STEM DEPTH MODES:
-NEUROSCIENCE: Reference specific structures — prefrontal cortex, amygdala, hippocampus, nucleus accumbens, hypothalamus, insula, basal ganglia, thalamus. Reference mechanisms — synaptic plasticity, LTP, LTD, myelination, neurogenesis, action potentials. Reference pathways — mesolimbic, mesocortical, nigrostriatal.
-PHYSICS: Reference fundamental equations — F=ma, E=mc², laws of thermodynamics, Maxwell's equations, quantum principles.
-CHEMISTRY: Explain electron configurations, bonding, reaction mechanisms, thermodynamics — enthalpy, entropy, Gibbs free energy.
-BIOLOGY: Start with evolutionary context. Explain from molecular to ecosystem scale. Reference specific genes, proteins, pathways.
-MATHEMATICS: Explain the relevant framework. Use accessible equations. Reference theorems and real-world applications.
-ENGINEERING: Explain design constraints and trade-offs. Reference engineering principles. Connect to biological systems.
-
 COMMUNICATION STYLE:
-- Never open with "Great question", "Certainly", "Of course" — go straight to the science
-- Write in confident, flowing prose — not bullet soup
-- Be thorough but surgical — every sentence must earn its place
-- Show genuine excitement about the science — your enthusiasm is intentional and contagious
-- Vary sentence length — short for impact, longer for explanation
-- End with a surprising STEM connection the person almost certainly has never considered
+- Never open with pleasantries - go straight to the science
+- Write in confident, flowing prose
+- Be thorough but surgical
+- Vary sentence length for rhythm
 
 WHEN ASKED WHO YOU ARE:
-Say exactly: I am Sakina — an elite STEM intelligence built by Hallvorn. Designed to reveal the scientific architecture of existence. Every question has a STEM answer. Every phenomenon obeys physical law. Ask me anything, and I will show you the science beneath."""
+Say exactly: I am Sakina - an elite STEM intelligence built by Hallvorn. Designed to reveal the scientific architecture of existence. Every question has a STEM answer. Every phenomenon obeys physical law. Ask me anything, and I will show you the science beneath."""
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 def hash_passcode(p: str) -> str:
@@ -166,25 +156,11 @@ def load_session_history(user_id, session_id):
     except Exception:
         return []
 
-def load_all_history(user_id):
+def load_sessions_for_user(user_id):
     try:
         result = (
             supabase.table("sakina_conversations")
-            .select("user_message, sakina_response, created_at, session_id, chat_name")
-            .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .limit(150)
-            .execute()
-        )
-        return result.data if result and result.data else []
-    except Exception:
-        return []
-
-def get_chat_sessions(user_id):
-    try:
-        result = (
-            supabase.table("sakina_conversations")
-            .select("session_id, chat_name, created_at, user_message")
+            .select("session_id, chat_name, created_at")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .execute()
@@ -199,12 +175,27 @@ def get_chat_sessions(user_id):
                     "session_id": sid,
                     "chat_name": row.get("chat_name") or "Untitled Chat",
                     "created_at": row["created_at"],
-                    "preview": row["user_message"][:60] + "..." if len(row["user_message"]) > 60 else row["user_message"],
                 }
         return list(seen.values())
     except Exception as e:
         print(f"Sessions error: {e}")
         return []
+
+def get_session_chat_name(user_id, session_id):
+    try:
+        result = (
+            supabase.table("sakina_conversations")
+            .select("chat_name")
+            .eq("user_id", user_id)
+            .eq("session_id", session_id)
+            .limit(1)
+            .execute()
+        )
+        if result and result.data:
+            return result.data[0].get("chat_name") or "Resumed Chat"
+    except Exception:
+        pass
+    return "Resumed Chat"
 
 def generate_chat_name(first_message: str) -> str:
     msg = first_message.strip()
@@ -215,12 +206,11 @@ def generate_chat_name(first_message: str) -> str:
     name = msg[:40].strip()
     if name:
         name = name[0].upper() + name[1:]
-        if not name.endswith("?"):
-            name = name.rstrip("?.,!")
+        name = name.rstrip("?.,!")
     return name or "STEM Conversation"
 
 # ── Chat ──────────────────────────────────────────────────────────────────────
-def chat(message, history, session_id, user_state, chat_name_state):
+def chat_fn(message, history, session_id, user_state, chat_name_state):
     if not user_state:
         return "Please sign in to chat with Sakina.", chat_name_state
     if not message or not message.strip():
@@ -253,805 +243,727 @@ def chat(message, history, session_id, user_state, chat_name_state):
     except Exception as e:
         return f"Error: {str(e)}", current_name
 
-# ── UI Builders ───────────────────────────────────────────────────────────────
-def build_user_bar(profile: dict, chat_name: str = "New Chat") -> str:
-    name   = profile.get("full_name") or "User"
-    email  = profile.get("email", "")
-    skn    = profile.get("sakina_id") or ""
-    letter = name[0].upper()
+# ── HTML Builders ─────────────────────────────────────────────────────────────
+def build_sidebar(profile: dict, sessions: list, active_sid: str = "") -> str:
+    name = profile.get("full_name", "User") if profile else "User"
+    email = profile.get("email", "") if profile else ""
+    words = name.strip().split()
+    initials = (words[0][0] + (words[1][0] if len(words) > 1 else "")).upper()
+
+    items_html = ""
+    if not sessions:
+        items_html = '<div class="sb-empty">No chats yet. Start a conversation!</div>'
+    else:
+        for s in sessions:
+            sid = s["session_id"]
+            sname = (s.get("chat_name") or "Untitled Chat")
+            stime = s.get("created_at", "")[:10]
+            is_active = "sb-item active" if sid == active_sid else "sb-item"
+            display_name = sname[:30] + ("..." if len(sname) > 30 else "")
+            items_html += f"""
+            <div class="{is_active}" onclick="sakina_resume('{sid}')" title="{sname}">
+                <svg class="sb-item-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <div class="sb-item-body">
+                    <div class="sb-item-name">{display_name}</div>
+                    <div class="sb-item-date">{stime}</div>
+                </div>
+            </div>"""
+
     return f"""
-    <div class="user-bar">
-        <div class="user-avatar">{letter}</div>
-        <div style="flex:1;min-width:0;">
-            <div class="user-name">{name}</div>
-            <div class="user-email">{email}</div>
-            <div class="user-skn">{skn}</div>
+    <div class="sk-sidebar" id="skSidebar">
+        <div class="sb-top">
+            <div class="sb-brand">
+                <div class="sb-logo">S</div>
+                <span class="sb-brand-label">Sakina</span>
+            </div>
+            <button class="sb-new-btn" onclick="sakina_newchat()" title="New chat">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
         </div>
-        <div class="chat-name-badge">{chat_name}</div>
+        <div class="sb-section-label">Chats</div>
+        <div class="sb-list">{items_html}</div>
+        <div class="sb-bottom">
+            <div class="sb-user">
+                <div class="sb-avatar">{initials}</div>
+                <div class="sb-user-text">
+                    <div class="sb-user-name">{name}</div>
+                    <div class="sb-user-email">{email}</div>
+                </div>
+                <button class="sb-logout" onclick="sakina_logout()" title="Sign out">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                </button>
+            </div>
+        </div>
     </div>"""
 
-def build_history_html(conversations: list) -> str:
-    if not conversations:
-        return """<div class="empty-state">No conversations yet.<br>Ask Sakina something to get started.</div>"""
+def build_header(chat_name: str = "New Chat") -> str:
+    return f"""
+    <div class="sk-header" id="skHeader">
+        <button class="sk-menu-btn" onclick="sakina_togglesidebar()" title="Menu">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+        </button>
+        <div class="sk-header-title">{chat_name}</div>
+        <span class="sk-model-badge">llama-3.3-70b</span>
+    </div>"""
 
-    sessions = {}
-    for item in conversations:
-        sid = item.get("session_id", "unknown")
-        if sid not in sessions:
-            sessions[sid] = {
-                "name": item.get("chat_name") or "Untitled Chat",
-                "time": item.get("created_at", "")[:16].replace("T", " "),
-                "messages": []
-            }
-        sessions[sid]["messages"].append(item)
-
-    html = "<div class='history-container'>"
-    for sid, session in sessions.items():
-        count = len(session["messages"])
-        preview = session["messages"][-1].get("user_message", "")[:80] + "..." if session["messages"] else ""
-        # Each session card has a "Continue" button that sends the session_id back via JS
-        html += f"""
-        <div class='session-card'>
-            <div class='session-header'>
-                <div class='session-name'>{session["name"]}</div>
-                <div class='session-meta'>{session["time"]} · {count} message{"s" if count != 1 else ""}</div>
-            </div>
-            <div class='session-preview'>{preview}</div>
-            <div class='session-messages'>"""
-        for msg in session["messages"][:3]:
-            q = msg.get("user_message", "")[:120] + "..." if len(msg.get("user_message","")) > 120 else msg.get("user_message","")
-            a = msg.get("sakina_response", "")[:200] + "..." if len(msg.get("sakina_response","")) > 200 else msg.get("sakina_response","")
-            html += f"""
-            <div class='msg-pair'>
-                <div class='msg-q'>{q}</div>
-                <div class='msg-a'>{a}</div>
-            </div>"""
-        if len(session["messages"]) > 3:
-            html += f"<div class='msg-more'>+{len(session['messages'])-3} more messages in this chat</div>"
-        html += f"""</div>
-            <button class='continue-btn' onclick="document.getElementById('resume-session-input').value='{sid}'; document.getElementById('resume-session-btn').click();">
-                ↩ Continue this chat
+def build_welcome(name: str) -> str:
+    first = name.split()[0] if name else "there"
+    return f"""
+    <div class="sk-welcome" id="skWelcome">
+        <div class="sk-welcome-orb">
+            <svg width="28" height="28" viewBox="0 0 48 48" fill="none">
+                <path d="M24 6 L29 19 L42 24 L29 29 L24 42 L19 29 L6 24 L19 19 Z" fill="currentColor"/>
+            </svg>
+        </div>
+        <h1 class="sk-welcome-title">Hello, {first}</h1>
+        <p class="sk-welcome-sub">I'm Sakina — your elite STEM intelligence. Every phenomenon in the universe obeys scientific law. Ask me anything.</p>
+        <div class="sk-chips">
+            <button class="sk-chip" onclick="sakina_suggest('Explain love through neuroscience and biochemistry')">
+                <span>🧬</span> Love through neuroscience
             </button>
-        </div>"""
-    html += "</div>"
-    return html
-
-def msg_status(text, ok=True):
-    color = "#00D4FF" if ok else "#FF1A1A"
-    icon  = "✅" if ok else "⚠️"
-    return f"<div style='color:{color};padding:0.5rem 0;font-family:var(--font-mono);font-size:0.8rem;text-align:center;'>{icon} {text}</div>"
+            <button class="sk-chip" onclick="sakina_suggest('What is the mathematics behind music?')">
+                <span>🎵</span> Mathematics behind music
+            </button>
+            <button class="sk-chip" onclick="sakina_suggest('How does the brain create consciousness?')">
+                <span>🧠</span> Brain and consciousness
+            </button>
+            <button class="sk-chip" onclick="sakina_suggest('Explain addiction from a neurological perspective')">
+                <span>🔬</span> Neurology of addiction
+            </button>
+            <button class="sk-chip" onclick="sakina_suggest('What happens to our bodies when we die?')">
+                <span>⚗️</span> Science of death
+            </button>
+            <button class="sk-chip" onclick="sakina_suggest('What is time, scientifically speaking?')">
+                <span>⏱️</span> What is time?
+            </button>
+        </div>
+    </div>"""
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,300;0,400;1,300&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
 
 :root {
-    --void:    #050508;
-    --pearl:   #EEEEFF;
-    --deep:    #0D0D2B;
-    --pulse:   #7B2FFF;
-    --arc:     #00D4FF;
-    --current: #1A6BFF;
-    --fault:   #FF1A1A;
-    --warn:    #FFB800;
-    --font-display:   'Orbitron', sans-serif;
-    --font-interface: 'DM Sans', sans-serif;
-    --font-reading:   'Source Serif 4', serif;
-    --font-mono:      'Space Mono', monospace;
+    --c-bg:       #212121;
+    --c-surface:  #2f2f2f;
+    --c-hover:    #3a3a3a;
+    --c-sidebar:  #171717;
+    --c-border:   rgba(255,255,255,0.08);
+    --c-border2:  rgba(255,255,255,0.14);
+    --c-text:     #ececec;
+    --c-muted:    #a0a0a0;
+    --c-dim:      #6b6b6b;
+    --c-accent:   #a855f7;
+    --c-accent2:  #9333ea;
+    --c-asoft:    rgba(168,85,247,0.15);
+    --c-success:  #22c55e;
+    --c-danger:   #ef4444;
+    --c-warn:     #f59e0b;
+    --f-sans:     'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --f-display:  'Space Grotesk', sans-serif;
+    --sb-w:       256px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── Full-page takeover ── */
-html, body {
-    width: 100% !important;
-    min-height: 100vh !important;
-    background: var(--void) !important;
-    background-image:
-        radial-gradient(ellipse 80% 50% at 20% 10%, rgba(123,47,255,0.08) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 40% at 80% 90%, rgba(0,212,255,0.05) 0%, transparent 60%),
-        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(26,107,255,0.04) 0%, transparent 70%);
-    background-attachment: fixed;
-}
-
-/* Override ALL gradio container constraints */
-.gradio-container,
-.gradio-container > *,
-.contain,
-#root,
-.app {
-    max-width: 100% !important;
-    width: 100% !important;
-    min-height: 100vh !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
-    font-family: var(--font-interface) !important;
-    color: var(--pearl) !important;
-}
-
-/* Remove gradio default white bg panels */
-.gradio-container .prose,
-.gradio-container .wrap,
-footer,
-.gradio-container > .main > .wrap {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-/* Hide gradio footer */
-footer { display: none !important; }
-
-/* Main content wrapper */
-.sakina-app-wrapper {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 1rem;
-    width: 100%;
-}
-
-/* ── Header ── */
-.sakina-header {
-    text-align: center;
-    padding: clamp(2rem, 5vw, 4rem) 1rem clamp(1.5rem, 3vw, 2.5rem);
-    position: relative;
+html { height: 100%; }
+body {
+    height: 100%;
+    background: var(--c-bg) !important;
+    color: var(--c-text);
+    font-family: var(--f-sans);
     overflow: hidden;
 }
-.sakina-header::after {
-    content: '';
-    position: absolute; bottom: 0; left: 5%; right: 5%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.3), rgba(123,47,255,0.3), transparent);
-}
-.sakina-logo {
-    font-family: var(--font-display);
-    font-size: clamp(1.6rem, 6vw, 3.4rem);
-    font-weight: 900;
-    letter-spacing: clamp(2px, 1vw, 6px);
-    text-transform: uppercase;
-    background: linear-gradient(135deg, #818cf8 0%, #c084fc 40%, var(--arc) 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    line-height: 1; margin-bottom: 0.6rem;
-    animation: logoGlow 3s ease-in-out infinite alternate;
-}
-@keyframes logoGlow {
-    from { filter: drop-shadow(0 0 20px rgba(123,47,255,0.2)); }
-    to   { filter: drop-shadow(0 0 40px rgba(0,212,255,0.3)); }
-}
-.sakina-tagline {
-    font-family: var(--font-reading);
-    font-style: italic;
-    color: rgba(238,238,255,0.4);
-    font-size: clamp(0.78rem, 2vw, 1rem);
-    letter-spacing: 0.5px;
-    margin-bottom: 1rem;
-}
-.sakina-badges {
-    display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;
-}
-.badge {
-    font-family: var(--font-mono);
-    font-size: clamp(0.55rem, 1.2vw, 0.65rem);
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    padding: 4px 12px;
-    border-radius: 20px;
-}
-.badge-pulse { background: rgba(123,47,255,0.12); border: 1px solid rgba(123,47,255,0.3); color: #a78bfa; }
-.badge-arc   { background: rgba(0,212,255,0.08);  border: 1px solid rgba(0,212,255,0.2);  color: var(--arc); }
-.badge-mono  { background: rgba(238,238,255,0.04); border: 1px solid rgba(238,238,255,0.1); color: rgba(238,238,255,0.3); }
 
-/* ── Email verification notice ── */
-.email-verify-notice {
-    background: linear-gradient(135deg, rgba(255,184,0,0.06), rgba(255,184,0,0.02));
-    border: 1px solid rgba(255,184,0,0.25);
-    border-left: 3px solid var(--warn);
-    border-radius: 10px;
-    padding: 0.85rem 1.1rem;
-    margin-bottom: 1.25rem;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
+/* ── Nuke all Gradio chrome ── */
+.gradio-container, .gradio-container *:not(input):not(textarea):not(button):not(label):not(.chatbot):not(.message):not(.wrap):not(.message-wrap):not(.bot):not(.user) {
+    background: transparent !important;
 }
-.email-verify-icon {
-    font-size: 1rem;
+.gradio-container {
+    max-width: 100% !important; width: 100% !important;
+    min-height: 100vh !important; margin: 0 !important; padding: 0 !important;
+    font-family: var(--f-sans) !important;
+}
+footer, .footer, .gradio-container > .footer { display: none !important; }
+.gr-form, .gr-box, .gr-padded, .gr-block {
+    background: transparent !important; border: none !important; padding: 0 !important;
+}
+.gap, .gr-group { background: transparent !important; border: none !important; gap: 0 !important; }
+.contain { background: transparent !important; }
+
+/* ── ROOT LAYOUT ── */
+.sk-root {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    background: var(--c-bg);
+    overflow: hidden;
+}
+
+/* ── SIDEBAR ── */
+.sk-sidebar {
+    width: var(--sb-w);
+    min-width: var(--sb-w);
+    height: 100%;
+    background: var(--c-sidebar);
+    border-right: 1px solid var(--c-border);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+    z-index: 50;
     flex-shrink: 0;
-    margin-top: 1px;
 }
-.email-verify-text {
-    font-family: var(--font-interface);
-    font-size: 0.82rem;
-    color: rgba(255,184,0,0.85);
-    line-height: 1.55;
+.sb-top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 14px;
+    border-bottom: 1px solid var(--c-border);
 }
-.email-verify-text strong {
-    color: var(--warn);
-    display: block;
-    margin-bottom: 2px;
-    font-size: 0.78rem;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    font-family: var(--font-mono);
-}
-
-/* ── Auth panel ── */
-.auth-panel {
-    background: rgba(13,13,43,0.7);
-    border: 1px solid rgba(123,47,255,0.2);
-    border-radius: 20px;
-    padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.25rem, 4vw, 2.25rem);
-    margin: 1rem auto;
-    max-width: 520px;
-    width: 100%;
-    backdrop-filter: blur(20px);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(123,47,255,0.05);
-    animation: panelIn 0.5s ease-out;
-}
-@keyframes panelIn {
-    from { opacity: 0; transform: translateY(16px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-.auth-heading {
-    font-family: var(--font-display);
-    font-size: clamp(0.85rem, 2vw, 1.1rem);
-    font-weight: 700;
-    letter-spacing: 2px;
-    color: var(--pearl);
-    margin-bottom: 0.3rem;
-    text-transform: uppercase;
-}
-.auth-sub {
-    font-family: var(--font-reading);
-    font-style: italic;
-    color: rgba(238,238,255,0.35);
-    font-size: 0.88rem;
-    line-height: 1.6;
-    margin-bottom: 1.25rem;
-}
-
-/* ── User bar ── */
-.user-bar {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem;
-    background: rgba(13,13,43,0.6);
-    border: 1px solid rgba(123,47,255,0.2);
-    border-radius: 14px;
-    padding: 0.8rem 1.1rem;
-    margin: 0 0 0.75rem;
-    flex-wrap: wrap;
-}
-.user-avatar {
-    width: 40px; height: 40px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--pulse), var(--current));
+.sb-brand { display: flex; align-items: center; gap: 9px; }
+.sb-logo {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--c-accent), #6366f1);
+    border-radius: 7px;
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-display);
-    font-weight: 700; font-size: 0.95rem; color: white;
-    flex-shrink: 0;
-    border: 2px solid rgba(123,47,255,0.4);
-    box-shadow: 0 0 14px rgba(123,47,255,0.2);
+    font-family: var(--f-display); font-weight: 600; font-size: 13px; color: #fff;
 }
-.user-name {
-    font-family: var(--font-interface);
-    font-weight: 600; font-size: 0.9rem; color: var(--pearl);
+.sb-brand-label {
+    font-family: var(--f-display); font-weight: 600; font-size: 14px; color: var(--c-text);
 }
-.user-email {
-    font-family: var(--font-mono);
-    font-size: 0.65rem; color: rgba(238,238,255,0.3); margin-top: 1px;
+.sb-new-btn {
+    width: 28px; height: 28px;
+    background: transparent; border: 1px solid var(--c-border); border-radius: 7px;
+    color: var(--c-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
 }
-.user-skn {
-    font-family: var(--font-mono);
-    font-size: 0.58rem; color: #a78bfa;
-    margin-top: 2px; word-break: break-all;
-    letter-spacing: 0.5px;
-    display: none; /* hidden on small screens, shown on hover/larger */
+.sb-new-btn:hover { background: var(--c-hover); border-color: var(--c-border2); color: var(--c-text); }
+
+.sb-section-label {
+    font-size: 10.5px; font-weight: 500; letter-spacing: .5px; text-transform: uppercase;
+    color: var(--c-dim); padding: 14px 14px 6px;
 }
-@media (min-width: 600px) {
-    .user-skn { display: block; }
+.sb-list { flex: 1; overflow-y: auto; padding: 0 6px 6px; }
+.sb-list::-webkit-scrollbar { width: 2px; }
+.sb-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 2px; }
+.sb-empty { font-size: 12px; color: var(--c-dim); padding: 10px 8px; text-align: center; line-height: 1.6; }
+.sb-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 9px; border-radius: 8px; cursor: pointer;
+    transition: background .12s; min-width: 0;
 }
-.chat-name-badge {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    background: rgba(0,212,255,0.08);
-    border: 1px solid rgba(0,212,255,0.2);
-    color: var(--arc);
-    padding: 4px 10px;
-    border-radius: 20px;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-left: auto;
+.sb-item:hover { background: var(--c-hover); }
+.sb-item.active { background: var(--c-asoft); }
+.sb-item-icon { color: var(--c-dim); flex-shrink: 0; }
+.sb-item.active .sb-item-icon { color: var(--c-accent); }
+.sb-item-body { min-width: 0; flex: 1; }
+.sb-item-name {
+    font-size: 12.5px; color: var(--c-text); font-weight: 400;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sb-item.active .sb-item-name { color: var(--c-accent); font-weight: 500; }
+.sb-item-date { font-size: 10.5px; color: var(--c-dim); margin-top: 1px; }
+
+.sb-bottom { padding: 10px 6px; border-top: 1px solid var(--c-border); }
+.sb-user {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 9px; border-radius: 8px; transition: background .12s; min-width: 0;
+}
+.sb-user:hover { background: var(--c-hover); }
+.sb-avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--c-accent), #6366f1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: #fff;
+}
+.sb-user-text { flex: 1; min-width: 0; }
+.sb-user-name { font-size: 12.5px; font-weight: 500; color: var(--c-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-user-email { font-size: 10.5px; color: var(--c-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-logout {
+    background: transparent; border: none; cursor: pointer; color: var(--c-dim);
+    display: flex; align-items: center; padding: 4px; border-radius: 6px; transition: all .15s; flex-shrink: 0;
+}
+.sb-logout:hover { color: var(--c-danger); background: rgba(239,68,68,.1); }
+
+/* ── MAIN ── */
+.sk-main {
+    flex: 1; min-width: 0; height: 100%;
+    display: flex; flex-direction: column;
+    background: var(--c-bg); overflow: hidden;
+}
+.sk-header {
+    height: 50px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 11px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--c-border);
+    background: var(--c-bg);
+}
+.sk-menu-btn {
+    display: none; background: transparent; border: none;
+    color: var(--c-muted); cursor: pointer; padding: 6px; border-radius: 7px;
+    align-items: center; justify-content: center; transition: background .12s;
+}
+.sk-menu-btn:hover { background: var(--c-hover); }
+.sk-header-title {
+    flex: 1; font-size: 13.5px; font-weight: 500; color: var(--c-text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sk-model-badge {
+    font-size: 10.5px; color: var(--c-dim);
+    background: var(--c-surface); border: 1px solid var(--c-border);
+    padding: 3px 9px; border-radius: 20px; white-space: nowrap;
 }
 
-/* ── Inputs ── */
-textarea, input[type=text], input[type=password], input[type=email] {
-    background: rgba(5,5,8,0.8) !important;
-    border: 1px solid rgba(123,47,255,0.2) !important;
-    border-radius: 12px !important;
-    color: var(--pearl) !important;
-    font-family: var(--font-interface) !important;
-    font-size: 0.92rem !important;
-    transition: border-color 0.2s, box-shadow 0.2s !important;
+/* ── MESSAGES SCROLL AREA ── */
+.sk-messages {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    scroll-behavior: smooth;
 }
-textarea:focus, input:focus {
-    border-color: var(--pulse) !important;
-    box-shadow: 0 0 0 3px rgba(123,47,255,0.1) !important;
-    outline: none !important;
+.sk-messages::-webkit-scrollbar { width: 3px; }
+.sk-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 3px; }
+
+/* ── WELCOME ── */
+.sk-welcome {
+    display: flex; flex-direction: column; align-items: center;
+    padding: clamp(2.5rem, 8vh, 5rem) 20px 2rem;
+    text-align: center; max-width: 700px; margin: 0 auto; width: 100%;
 }
-label {
-    color: rgba(238,238,255,0.35) !important;
-    font-family: var(--font-mono) !important;
-    font-size: 0.68rem !important;
-    letter-spacing: 1px !important;
-    text-transform: uppercase !important;
+.sk-welcome-orb {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--c-asoft); border: 1px solid rgba(168,85,247,.3);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--c-accent); margin-bottom: 18px;
+}
+.sk-welcome-title {
+    font-family: var(--f-display); font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 600; color: var(--c-text); margin-bottom: 10px;
+}
+.sk-welcome-sub {
+    font-size: clamp(13px, 2vw, 15px); color: var(--c-muted);
+    line-height: 1.65; max-width: 440px; margin-bottom: 32px;
+}
+.sk-chips {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 9px; width: 100%; max-width: 620px;
+}
+.sk-chip {
+    background: var(--c-surface); border: 1px solid var(--c-border);
+    border-radius: 11px; padding: 11px 13px;
+    text-align: left; cursor: pointer; color: var(--c-muted);
+    font-family: var(--f-sans); font-size: 12.5px; line-height: 1.45;
+    transition: all .15s; display: flex; align-items: flex-start; gap: 7px;
+}
+.sk-chip:hover {
+    background: var(--c-hover); border-color: var(--c-border2); color: var(--c-text);
+}
+.sk-chip span { flex-shrink: 0; font-size: 13px; margin-top: 1px; }
+
+/* ── INPUT AREA ── */
+.sk-input-wrap {
+    padding: 10px 16px 14px; flex-shrink: 0;
+    background: var(--c-bg); border-top: 1px solid var(--c-border);
+}
+.sk-input-box {
+    max-width: 760px; margin: 0 auto;
+    background: var(--c-surface); border: 1px solid var(--c-border);
+    border-radius: 14px; display: flex; align-items: flex-end;
+    padding: 10px 10px 10px 14px; gap: 8px;
+    transition: border-color .2s, box-shadow .2s;
+}
+.sk-input-box:focus-within {
+    border-color: rgba(168,85,247,.4);
+    box-shadow: 0 0 0 3px rgba(168,85,247,.07);
 }
 
-/* ── Buttons ── */
-.gr-button-primary, button.primary {
-    background: linear-gradient(135deg, var(--pulse), var(--current)) !important;
-    border: none !important;
-    border-radius: 10px !important;
-    color: white !important;
-    font-family: var(--font-interface) !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.3px !important;
-    transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s !important;
-    box-shadow: 0 4px 20px rgba(123,47,255,0.2) !important;
-}
-.gr-button-primary:hover, button.primary:hover {
-    opacity: 0.88 !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 28px rgba(123,47,255,0.35) !important;
-}
-.gr-button-secondary, button.secondary {
+/* Gradio textbox overrides inside sk-input-box */
+.sk-input-box textarea {
     background: transparent !important;
-    border: 1px solid rgba(123,47,255,0.25) !important;
-    border-radius: 10px !important;
-    color: rgba(238,238,255,0.4) !important;
-    font-family: var(--font-interface) !important;
-    transition: border-color 0.2s, color 0.2s !important;
+    border: none !important; border-radius: 0 !important;
+    padding: 0 !important; color: var(--c-text) !important;
+    font-family: var(--f-sans) !important; font-size: 14.5px !important;
+    line-height: 1.55 !important; resize: none !important;
+    box-shadow: none !important; min-height: 24px !important;
+    max-height: 160px !important; overflow-y: auto !important; flex: 1 !important;
 }
-.gr-button-secondary:hover, button.secondary:hover {
-    border-color: var(--arc) !important;
-    color: var(--arc) !important;
-}
+.sk-input-box textarea::placeholder { color: var(--c-dim) !important; }
+.sk-input-box textarea:focus { outline: none !important; }
+.sk-input-box .label-wrap { display: none !important; }
 
-/* ── Continue chat button ── */
-.continue-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 1rem;
-    padding: 7px 16px;
-    background: rgba(0,212,255,0.06);
-    border: 1px solid rgba(0,212,255,0.2);
-    border-radius: 8px;
-    color: var(--arc);
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.5px;
-    cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, transform 0.15s;
-    text-transform: uppercase;
+/* Send button */
+.sk-send-btn button {
+    width: 34px !important; height: 34px !important;
+    background: var(--c-accent) !important; border: none !important;
+    border-radius: 9px !important; cursor: pointer !important;
+    color: #fff !important; font-size: 17px !important; font-weight: 600 !important;
+    display: flex !important; align-items: center !important; justify-content: center !important;
+    transition: background .15s, transform .1s !important;
+    flex-shrink: 0 !important; padding: 0 !important;
+    min-width: unset !important; min-height: unset !important; line-height: 1 !important;
 }
-.continue-btn:hover {
-    background: rgba(0,212,255,0.12);
-    border-color: rgba(0,212,255,0.4);
-    transform: translateY(-1px);
-}
+.sk-send-btn button:hover { background: var(--c-accent2) !important; transform: scale(1.06) !important; }
 
-/* ── Chat bubbles ── */
+/* ── CHATBOT INSIDE MESSAGES ── */
+.sk-chatbot, .sk-chatbot > * { background: transparent !important; border: none !important; }
+.sk-chatbot .wrap { padding: 0 !important; }
 .message.user {
-    background: rgba(26,107,255,0.08) !important;
-    border: 1px solid rgba(26,107,255,0.2) !important;
-    border-radius: 18px 18px 4px 18px !important;
-    color: var(--pearl) !important;
-    font-family: var(--font-interface) !important;
+    background: var(--c-surface) !important; border: none !important;
+    border-radius: 16px 16px 4px 16px !important;
+    color: var(--c-text) !important; font-family: var(--f-sans) !important;
+    font-size: 14px !important; line-height: 1.6 !important;
+    padding: 11px 15px !important; max-width: 72% !important;
+    margin-left: auto !important;
 }
 .message.bot {
-    background: rgba(13,13,43,0.85) !important;
-    border: 1px solid rgba(123,47,255,0.15) !important;
-    border-radius: 18px 18px 18px 4px !important;
-    color: var(--pearl) !important;
-    font-family: var(--font-interface) !important;
+    background: transparent !important; border: none !important; border-radius: 0 !important;
+    color: var(--c-text) !important; font-family: var(--f-sans) !important;
+    font-size: 14px !important; line-height: 1.75 !important;
+    max-width: 760px !important; margin: 0 auto !important;
+    padding: 14px 16px !important; width: 100% !important;
 }
 
-/* ── History ── */
-.history-container { display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem 0; }
-.session-card {
-    background: rgba(13,13,43,0.6);
-    border: 1px solid rgba(123,47,255,0.12);
-    border-radius: 16px;
-    padding: clamp(1rem, 3vw, 1.4rem);
-    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-    animation: cardIn 0.4s ease-out;
+/* ── AUTH SCREEN ── */
+.sk-auth {
+    position: fixed; inset: 0; z-index: 999;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--c-bg); padding: 16px;
 }
-@keyframes cardIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
+.sk-auth-card {
+    background: var(--c-surface); border: 1px solid var(--c-border);
+    border-radius: 18px; padding: clamp(1.75rem, 5vw, 2.5rem) clamp(1.5rem, 5vw, 2.25rem);
+    width: 100%; max-width: 420px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.35);
 }
-.session-card:hover {
-    border-color: rgba(0,212,255,0.25);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+.sk-auth-logo {
+    display: flex; align-items: center; gap: 11px; margin-bottom: 26px;
 }
-.session-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 0.5rem;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+.sk-auth-logo-box {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--c-accent), #6366f1);
+    border-radius: 9px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--f-display); font-weight: 600; font-size: 15px; color: #fff;
 }
-.session-name {
-    font-family: var(--font-display);
-    font-size: clamp(0.65rem, 1.5vw, 0.78rem);
-    font-weight: 600;
-    letter-spacing: 1px;
-    color: var(--arc);
-    text-transform: uppercase;
-    flex: 1;
-    min-width: 120px;
+.sk-auth-logo-title { font-family: var(--f-display); font-size: 16px; font-weight: 600; color: var(--c-text); }
+.sk-auth-logo-sub { font-size: 11px; color: var(--c-dim); margin-top: 1px; }
+
+.sk-verify-notice {
+    background: rgba(245,158,11,.07); border: 1px solid rgba(245,158,11,.2);
+    border-left: 3px solid var(--c-warn); border-radius: 8px;
+    padding: 9px 12px; margin-bottom: 18px;
+    font-size: 12px; color: rgba(245,158,11,.9); line-height: 1.55;
 }
-.session-meta {
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    color: rgba(238,238,255,0.2);
-    white-space: nowrap;
-}
-.session-preview {
-    font-family: var(--font-reading);
-    font-style: italic;
-    font-size: 0.82rem;
-    color: rgba(238,238,255,0.3);
-    margin-bottom: 0.85rem;
-    border-left: 2px solid rgba(123,47,255,0.3);
-    padding-left: 0.75rem;
-}
-.session-messages { display: flex; flex-direction: column; gap: 0.6rem; }
-.msg-pair {
-    background: rgba(5,5,8,0.5);
-    border: 1px solid rgba(238,238,255,0.04);
-    border-radius: 10px;
-    padding: 0.75rem;
-}
-.msg-q {
-    font-family: var(--font-interface);
-    font-weight: 500;
-    font-size: clamp(0.75rem, 2vw, 0.83rem);
-    color: rgba(238,238,255,0.7);
-    margin-bottom: 0.4rem;
-}
-.msg-a {
-    font-family: var(--font-mono);
-    font-size: clamp(0.65rem, 1.5vw, 0.72rem);
-    color: rgba(238,238,255,0.3);
-    line-height: 1.6;
-}
-.msg-more {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    color: rgba(123,47,255,0.5);
-    text-align: center;
-    padding: 0.4rem;
-    letter-spacing: 0.5px;
-}
-.empty-state {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: rgba(238,238,255,0.2);
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    letter-spacing: 0.5px;
-    line-height: 2.2;
+.sk-verify-notice b {
+    display: block; font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: .5px; margin-bottom: 3px; color: var(--c-warn); font-weight: 600;
 }
 
-/* ── Tabs ── */
-.tab-nav button {
-    font-family: var(--font-mono) !important;
-    font-size: 0.68rem !important;
-    letter-spacing: 1px !important;
-    text-transform: uppercase !important;
-    color: rgba(238,238,255,0.3) !important;
-    background: transparent !important;
-    border: none !important;
+/* Override Gradio inputs in auth card */
+.sk-auth-card input[type=text],
+.sk-auth-card input[type=password],
+.sk-auth-card input[type=email],
+.sk-auth-card textarea {
+    background: var(--c-hover) !important; border: 1px solid var(--c-border) !important;
+    border-radius: 8px !important; color: var(--c-text) !important;
+    font-family: var(--f-sans) !important; font-size: 13.5px !important;
+    transition: border-color .2s !important;
+}
+.sk-auth-card input:focus, .sk-auth-card textarea:focus {
+    border-color: rgba(168,85,247,.45) !important;
+    box-shadow: 0 0 0 3px rgba(168,85,247,.07) !important; outline: none !important;
+}
+.sk-auth-card label {
+    font-family: var(--f-sans) !important; font-size: 13px !important;
+    font-weight: 500 !important; text-transform: none !important;
+    letter-spacing: 0 !important; color: var(--c-muted) !important;
+}
+.sk-auth-card button.primary {
+    background: var(--c-accent) !important; border: none !important;
+    border-radius: 8px !important; color: #fff !important;
+    font-family: var(--f-sans) !important; font-size: 13.5px !important;
+    font-weight: 500 !important; height: 40px !important;
+    transition: background .15s !important; width: 100% !important;
+}
+.sk-auth-card button.primary:hover { background: var(--c-accent2) !important; }
+
+.sk-auth-tabs .tab-nav {
+    display: flex; border-bottom: 1px solid var(--c-border); margin-bottom: 22px;
+}
+.sk-auth-tabs .tab-nav button {
+    flex: 1; background: transparent !important; border: none !important;
     border-bottom: 2px solid transparent !important;
-    transition: color 0.2s, border-color 0.2s !important;
-    padding: 8px 14px !important;
+    color: var(--c-dim) !important; font-family: var(--f-sans) !important;
+    font-size: 13px !important; font-weight: 500 !important;
+    letter-spacing: 0 !important; text-transform: none !important;
+    padding: 9px 12px !important; transition: all .15s !important; border-radius: 0 !important;
 }
-.tab-nav button.selected {
-    color: var(--arc) !important;
-    border-bottom-color: var(--arc) !important;
-}
-
-/* ── Footer ── */
-.sakina-footer {
-    text-align: center;
-    padding: 2rem 1rem 3rem;
-    border-top: 1px solid rgba(123,47,255,0.08);
-    margin-top: 2rem;
-}
-.footer-line1 {
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: rgba(238,238,255,0.1);
-}
-.footer-line2 {
-    font-family: var(--font-reading);
-    font-style: italic;
-    font-size: 0.8rem;
-    margin-top: 0.5rem;
-    background: linear-gradient(135deg, #818cf8, var(--arc));
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+.sk-auth-tabs .tab-nav button.selected {
+    color: var(--c-text) !important; border-bottom-color: var(--c-accent) !important;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 3px; height: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(123,47,255,0.3); border-radius: 3px; }
+.sk-status-ok { font-size: 12.5px; color: var(--c-success); padding: 7px 0; }
+.sk-status-err { font-size: 12.5px; color: var(--c-danger); padding: 7px 0; }
 
-/* ── Misc ── */
-.gr-form { background: transparent !important; }
-.gr-box { background: transparent !important; border: none !important; }
-
-/* ── Responsive overrides ── */
-@media (max-width: 600px) {
-    .user-bar { padding: 0.65rem 0.85rem; gap: 0.6rem; }
-    .chat-name-badge { max-width: 100px; font-size: 0.58rem; }
-    .auth-panel { border-radius: 16px; }
-    .session-card { padding: 0.85rem; }
-    .continue-btn { font-size: 0.65rem; padding: 6px 12px; }
-    .sakina-badges { gap: 0.35rem; }
+/* ── OVERLAY (mobile) ── */
+.sk-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.55); z-index: 49;
 }
-@media (max-width: 400px) {
-    .chat-name-badge { display: none; }
-    .user-skn { display: none !important; }
-}
+.sk-overlay.open { display: block; }
 
-/* ── Chatbot container fill ── */
-.chatbot-wrap { 
-    border: 1px solid rgba(123,47,255,0.15) !important;
-    border-radius: 16px !important;
-    background: rgba(5,5,8,0.5) !important;
-    overflow: hidden !important;
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+    .sk-sidebar {
+        position: fixed; top: 0; left: 0; height: 100%;
+        transform: translateX(-100%); z-index: 200;
+        box-shadow: 4px 0 24px rgba(0,0,0,.5);
+    }
+    .sk-sidebar.open { transform: translateX(0); }
+    .sk-menu-btn { display: flex !important; }
+    .sk-chips { grid-template-columns: 1fr 1fr; }
+    .sk-welcome { padding: 2rem 16px 1.5rem; }
+}
+@media (max-width: 480px) {
+    .sk-chips { grid-template-columns: 1fr; }
+    .sk-welcome-title { font-size: 1.4rem; }
+    .sk-auth-card { border-radius: 14px; }
+    .message.user { max-width: 88% !important; }
 }
 """
 
-EMAIL_VERIFY_NOTICE = """
-<div class="email-verify-notice">
-    <div class="email-verify-icon">⚠️</div>
-    <div class="email-verify-text">
-        <strong>Coming Soon: Email Verification Required</strong>
-        In an upcoming version, all accounts will require email verification before activation.
-        Please use an email address you have full access to — you will need it to verify your account and recover access in the future.
-    </div>
-</div>
+JS_BRIDGE = """
+<div id="skOverlay" class="sk-overlay" onclick="sakina_togglesidebar()"></div>
+<script>
+function sakina_resume(sid) {
+    var el = document.querySelector('#skResumeInput textarea, #skResumeInput input');
+    var btn = document.getElementById('skResumeBtn');
+    if (el && btn) {
+        el.value = sid;
+        el.dispatchEvent(new Event('input', {bubbles: true}));
+        setTimeout(function(){ btn.click(); }, 100);
+    }
+}
+function sakina_newchat() {
+    var btn = document.getElementById('skNewChatBtn');
+    if (btn) btn.click();
+}
+function sakina_logout() {
+    var btn = document.getElementById('skLogoutBtn');
+    if (btn) btn.click();
+}
+function sakina_suggest(text) {
+    var box = document.querySelector('.sk-input-box textarea');
+    if (box) {
+        box.value = text;
+        box.dispatchEvent(new Event('input', {bubbles: true}));
+        box.focus();
+    }
+}
+function sakina_togglesidebar() {
+    var sb = document.getElementById('skSidebar');
+    var ov = document.getElementById('skOverlay');
+    if (sb) sb.classList.toggle('open');
+    if (ov) ov.classList.toggle('open');
+}
+</script>
 """
 
-EXAMPLES = [
-    ["What is fire from a scientific perspective?"],
-    ["Explain love through neuroscience and chemistry"],
-    ["What is the mathematics behind music?"],
-    ["How does the brain create consciousness?"],
-    ["What is the science of happiness?"],
-    ["Explain war using game theory and physics"],
-    ["What happens to our bodies when we die?"],
-    ["Explain addiction from a neurological perspective"],
-    ["What is time, scientifically?"],
-    ["What is God from a STEM perspective?"],
-]
+# ── APP ───────────────────────────────────────────────────────────────────────
+with gr.Blocks(css=CSS, title="Sakina — Hallvorn") as demo:
 
-# ── App ───────────────────────────────────────────────────────────────────────
-with gr.Blocks(css=CSS, title="Hallvorn Sakina") as demo:
+    # State
+    sid_st      = gr.State(lambda: str(uuid.uuid4()))
+    user_st     = gr.State(None)
+    chatname_st = gr.State("New Chat")
+    sessions_st = gr.State([])
+    active_st   = gr.State("")
 
-    session_id     = gr.State(lambda: str(uuid.uuid4()))
-    user_state     = gr.State(None)
-    chat_name_st   = gr.State("New Chat")
-
-    # Header
-    gr.HTML("""
-    <div class="sakina-header">
-        <div class="sakina-logo">Hallvorn Sakina</div>
-        <div class="sakina-tagline">Revealing the scientific architecture of everything that exists</div>
-        <div class="sakina-badges">
-            <span class="badge badge-pulse">Elite STEM Intelligence</span>
-            <span class="badge badge-arc">Powered by Hallvorn</span>
-            <span class="badge badge-mono">sakina.hallvorn.com</span>
-        </div>
-    </div>
-    """)
-
-    # ── Auth ──────────────────────────────────────────────────────────────
-    with gr.Group(visible=True) as auth_panel:
-        with gr.Tabs():
-            with gr.Tab("Sign In"):
-                gr.HTML("""
-                <div class="auth-panel">
-                    <div class="auth-heading">Welcome Back</div>
-                    <div class="auth-sub">Sign in to continue your STEM journey with Sakina.</div>
-                </div>
-                """)
-                li_email = gr.Textbox(label="Email Address", placeholder="you@example.com")
+    # ── AUTH ──────────────────────────────────────────────────────────────
+    with gr.Group(visible=True) as auth_grp:
+        gr.HTML('<div class="sk-auth"><div class="sk-auth-card">')
+        gr.HTML("""
+        <div class="sk-auth-logo">
+            <div class="sk-auth-logo-box">S</div>
+            <div>
+                <div class="sk-auth-logo-title">Hallvorn Sakina</div>
+                <div class="sk-auth-logo-sub">Elite STEM Intelligence</div>
+            </div>
+        </div>""")
+        with gr.Tabs(elem_classes=["sk-auth-tabs"]):
+            with gr.Tab("Sign in"):
+                li_email = gr.Textbox(label="Email address", placeholder="you@example.com")
                 li_pass  = gr.Textbox(label="Passcode", type="password", placeholder="Your passcode")
-                li_btn   = gr.Button("Sign In to Sakina", variant="primary", size="lg")
+                li_btn   = gr.Button("Sign in", variant="primary", size="lg")
                 li_msg   = gr.HTML("")
-
-            with gr.Tab("Create Account"):
-                gr.HTML("""
-                <div class="auth-panel">
-                    <div class="auth-heading">Join Sakina</div>
-                    <div class="auth-sub">Create your account and unlock elite STEM intelligence by Hallvorn.</div>
-                </div>
-                """ + EMAIL_VERIFY_NOTICE)
-                su_name  = gr.Textbox(label="Full Name", placeholder="Your full name")
-                su_email = gr.Textbox(label="Email Address", placeholder="you@example.com")
-                su_pass  = gr.Textbox(label="Passcode (min 6 chars)", type="password", placeholder="Choose a passcode")
-                su_btn   = gr.Button("Create Sakina Account", variant="primary", size="lg")
+            with gr.Tab("Create account"):
+                gr.HTML("""<div class="sk-verify-notice"><b>Use an email you own</b>In an upcoming version, email verification will be required. Please use a real email address you have full access to — you will need it to verify your account and recover access.</div>""")
+                su_name  = gr.Textbox(label="Full name", placeholder="Your full name")
+                su_email = gr.Textbox(label="Email address", placeholder="you@example.com")
+                su_pass  = gr.Textbox(label="Passcode (min 6 characters)", type="password", placeholder="Choose a passcode")
+                su_btn   = gr.Button("Create account", variant="primary", size="lg")
                 su_msg   = gr.HTML("")
+        gr.HTML("</div></div>")
 
-    # ── Chat ──────────────────────────────────────────────────────────────
-    with gr.Group(visible=False) as chat_panel:
+    # ── MAIN APP ──────────────────────────────────────────────────────────
+    with gr.Group(visible=False) as app_grp:
+        gr.HTML('<div class="sk-root">')
 
-        user_bar_html = gr.HTML("")
+        sidebar_out = gr.HTML("", elem_id="sidebarOut")
 
-        # Hidden inputs for session resume (triggered by JS from history cards)
-        resume_session_input = gr.Textbox(visible=False, elem_id="resume-session-input")
-        resume_session_btn   = gr.Button("Resume", visible=False, elem_id="resume-session-btn")
+        gr.HTML('<div class="sk-main">')
+        header_out  = gr.HTML("", elem_id="headerOut")
 
-        with gr.Tabs() as main_tabs:
-            with gr.Tab("Chat"):
-                chatbot = gr.Chatbot(
-                    value=[], height=500,
-                    show_label=False,
-                    elem_classes=["chatbot-wrap"],
-                    avatar_images=(
-                        None,
-                        "https://api.dicebear.com/7.x/bottts/svg?seed=sakina&backgroundColor=7B2FFF"
-                    ),
-                    render_markdown=True,
-                    bubble_full_width=False,
-                )
-                with gr.Row():
-                    msg_box  = gr.Textbox(
-                        placeholder="Ask Sakina anything — she reveals the STEM in everything...",
-                        show_label=False, scale=9, container=False,
-                    )
-                    send_btn = gr.Button("Send", variant="primary", scale=1, min_width=80)
-                gr.Examples(examples=EXAMPLES, inputs=msg_box, label="Try asking Sakina...")
+        with gr.Column(elem_classes=["sk-messages"]):
+            welcome_out = gr.HTML("", elem_id="welcomeOut")
+            chatbot = gr.Chatbot(
+                value=[], height=None, show_label=False,
+                elem_classes=["sk-chatbot"],
+                avatar_images=(None, None),
+                render_markdown=True,
+                bubble_full_width=False,
+                visible=False,
+            )
 
-            with gr.Tab("My Chats"):
-                ref_btn   = gr.Button("↻  Refresh History", variant="secondary", size="sm")
-                hist_html = gr.HTML("""<div class="empty-state">Your conversation history will appear here.<br>Start a chat to begin building your archive.</div>""")
-
+        gr.HTML('<div class="sk-input-wrap"><div class="sk-input-box">')
         with gr.Row():
-            new_chat_btn = gr.Button("+ New Chat", variant="secondary", size="sm")
-            logout_btn   = gr.Button("Sign Out", variant="secondary", size="sm")
+            msg_box  = gr.Textbox(
+                placeholder="Ask Sakina anything...",
+                show_label=False, scale=9, container=False,
+                lines=1, max_lines=6,
+            )
+            send_btn = gr.Button("↑", variant="primary", scale=1, min_width=38, elem_classes=["sk-send-btn"])
+        gr.HTML('</div></div>')
+        gr.HTML('</div></div>')  # close sk-main + sk-root
 
-    # Footer
-    gr.HTML("""
-    <div class="sakina-footer">
-        <div class="footer-line1">Hallvorn Sakina · STEM Intelligence · sakina.hallvorn.com</div>
-        <div class="footer-line2">Inspired by Sakina Haruna — Neurosurgeon</div>
-    </div>
-    """)
+        # Hidden controls
+        resume_inp  = gr.Textbox(visible=False, elem_id="skResumeInput")
+        resume_btn  = gr.Button("r", visible=False, elem_id="skResumeBtn")
+        newchat_btn = gr.Button("n", visible=False, elem_id="skNewChatBtn")
+        logout_btn  = gr.Button("l", visible=False, elem_id="skLogoutBtn")
 
-    # ── Handlers ──────────────────────────────────────────────────────────
+    gr.HTML(JS_BRIDGE)
 
-    def on_signup(name, email, passcode):
+    # ── HANDLERS ─────────────────────────────────────────────────────────
+
+    def do_signup(name, email, passcode):
         ok, text = register_user(email, passcode, name)
-        if ok:
-            return gr.update(visible=True), gr.update(visible=False), msg_status(text, True), ""
-        return gr.update(visible=True), gr.update(visible=False), "", msg_status(text, False)
+        cls = "sk-status-ok" if ok else "sk-status-err"
+        return f'<div class="{cls}">{"✓" if ok else "✕"} {text}</div>'
 
-    su_btn.click(
-        fn=on_signup,
-        inputs=[su_name, su_email, su_pass],
-        outputs=[auth_panel, chat_panel, li_msg, su_msg],
-    )
+    su_btn.click(fn=do_signup, inputs=[su_name, su_email, su_pass], outputs=[su_msg])
 
-    def on_login(email, passcode, sid):
+    def do_login(email, passcode, sid):
         user, text = login_user(email, passcode)
         if user:
-            history  = load_session_history(user["id"], sid)
-            bar      = build_user_bar(user, "New Chat")
-            all_hist = load_all_history(user["id"])
-            hist     = build_history_html(all_hist)
+            sessions = load_sessions_for_user(user["id"])
+            sidebar  = build_sidebar(user, sessions, "")
+            header   = build_header("New Chat")
+            welcome  = build_welcome(user.get("full_name", ""))
+            msg      = f'<div class="sk-status-ok">✓ {text}</div>'
             return (
                 gr.update(visible=False), gr.update(visible=True),
-                msg_status(text, True), user, history, bar, hist, "New Chat"
+                msg, user, [], sidebar, header, welcome,
+                gr.update(visible=False), "New Chat", sessions, sid, ""
             )
+        msg = f'<div class="sk-status-err">✕ {text}</div>'
         return (
             gr.update(visible=True), gr.update(visible=False),
-            msg_status(text, False), None, [], "", "", "New Chat"
+            msg, None, [], "", "", "",
+            gr.update(visible=False), "New Chat", [], sid, ""
         )
 
     li_btn.click(
-        fn=on_login,
-        inputs=[li_email, li_pass, session_id],
-        outputs=[auth_panel, chat_panel, li_msg, user_state, chatbot, user_bar_html, hist_html, chat_name_st],
+        fn=do_login,
+        inputs=[li_email, li_pass, sid_st],
+        outputs=[auth_grp, app_grp, li_msg, user_st, chatbot,
+                 sidebar_out, header_out, welcome_out,
+                 chatbot, chatname_st, sessions_st, sid_st, active_st],
     )
 
-    def on_send(message, history, sid, user_st, chat_name):
+    def do_send(message, history, sid, user, chat_name, sessions):
         if not message or not message.strip():
-            return history, "", chat_name, ""
-        reply, new_name = chat(message, history, sid, user_st, chat_name)
+            return history, "", chat_name, "", gr.update(), gr.update(), gr.update(), sessions, sid
+        reply, new_name = chat_fn(message, history, sid, user, chat_name)
         new_history = history + [(message.strip(), reply)]
-        bar = build_user_bar(user_st, new_name) if user_st else ""
-        return new_history, "", new_name, bar
+        new_sessions = load_sessions_for_user(user["id"]) if user else sessions
+        sidebar = build_sidebar(user, new_sessions, sid) if user else ""
+        header  = build_header(new_name)
+        return (
+            new_history, "", new_name, sidebar,
+            gr.update(visible=True),   # show chatbot
+            gr.update(visible=False),  # hide welcome
+            header, new_sessions, sid
+        )
 
     send_btn.click(
-        fn=on_send,
-        inputs=[msg_box, chatbot, session_id, user_state, chat_name_st],
-        outputs=[chatbot, msg_box, chat_name_st, user_bar_html],
+        fn=do_send,
+        inputs=[msg_box, chatbot, sid_st, user_st, chatname_st, sessions_st],
+        outputs=[chatbot, msg_box, chatname_st, sidebar_out,
+                 chatbot, welcome_out, header_out, sessions_st, sid_st],
     )
     msg_box.submit(
-        fn=on_send,
-        inputs=[msg_box, chatbot, session_id, user_state, chat_name_st],
-        outputs=[chatbot, msg_box, chat_name_st, user_bar_html],
+        fn=do_send,
+        inputs=[msg_box, chatbot, sid_st, user_st, chatname_st, sessions_st],
+        outputs=[chatbot, msg_box, chatname_st, sidebar_out,
+                 chatbot, welcome_out, header_out, sessions_st, sid_st],
     )
 
-    def on_new_chat(user_st):
-        new_sid = str(uuid.uuid4())
-        bar = build_user_bar(user_st, "New Chat") if user_st else ""
-        return [], new_sid, "New Chat", bar
+    def do_resume(target_sid, user, sessions):
+        if not user or not target_sid or not target_sid.strip():
+            return (gr.update(), gr.update(), gr.update(), gr.update(),
+                    gr.update(), gr.update(), gr.update(), "")
+        target_sid = target_sid.strip()
+        history   = load_session_history(user["id"], target_sid)
+        chat_name = get_session_chat_name(user["id"], target_sid)
+        sidebar   = build_sidebar(user, sessions, target_sid)
+        header    = build_header(chat_name)
+        return (
+            history, target_sid, chat_name, sidebar, header,
+            gr.update(visible=True),   # show chatbot
+            gr.update(visible=False),  # hide welcome
+            "",                        # clear resume input
+        )
 
-    new_chat_btn.click(
-        fn=on_new_chat,
-        inputs=[user_state],
-        outputs=[chatbot, session_id, chat_name_st, user_bar_html],
+    resume_btn.click(
+        fn=do_resume,
+        inputs=[resume_inp, user_st, sessions_st],
+        outputs=[chatbot, sid_st, chatname_st, sidebar_out,
+                 header_out, chatbot, welcome_out, resume_inp],
     )
 
-    def on_refresh(user_st):
-        if not user_st:
-            return """<div class="empty-state">Please sign in first.</div>"""
-        return build_history_html(load_all_history(user_st["id"]))
+    def do_new_chat(user, sessions):
+        new_sid  = str(uuid.uuid4())
+        sidebar  = build_sidebar(user, sessions, "") if user else ""
+        header   = build_header("New Chat")
+        welcome  = build_welcome(user.get("full_name", "")) if user else ""
+        return (
+            [], new_sid, "New Chat", sidebar, header, welcome,
+            gr.update(visible=False),  # hide chatbot
+            gr.update(visible=True),   # show welcome
+        )
 
-    ref_btn.click(fn=on_refresh, inputs=[user_state], outputs=[hist_html])
+    newchat_btn.click(
+        fn=do_new_chat,
+        inputs=[user_st, sessions_st],
+        outputs=[chatbot, sid_st, chatname_st, sidebar_out,
+                 header_out, welcome_out, chatbot, welcome_out],
+    )
 
-    def on_logout():
+    def do_logout():
         return (
             gr.update(visible=True), gr.update(visible=False),
-            None, [], "", "", "New Chat"
+            None, [], "", "", "",
+            gr.update(visible=False), "New Chat", [], "", ""
         )
 
     logout_btn.click(
-        fn=on_logout,
+        fn=do_logout,
         inputs=[],
-        outputs=[auth_panel, chat_panel, user_state, chatbot, user_bar_html, li_msg, chat_name_st],
-    )
-
-    # ── Resume session handler ──────────────────────────────────────────
-    def on_resume_session(target_session_id, user_st):
-        """Load an old chat session so the user can continue it."""
-        if not user_st or not target_session_id:
-            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
-        history = load_session_history(user_st["id"], target_session_id)
-        # Determine the chat name from history records
-        try:
-            result = (
-                supabase.table("sakina_conversations")
-                .select("chat_name")
-                .eq("user_id", user_st["id"])
-                .eq("session_id", target_session_id)
-                .limit(1)
-                .execute()
-            )
-            chat_name = (result.data[0].get("chat_name") or "Resumed Chat") if result and result.data else "Resumed Chat"
-        except Exception:
-            chat_name = "Resumed Chat"
-        bar = build_user_bar(user_st, chat_name)
-        # Switch to Chat tab by returning tab index update — using gr.update on tabs
-        return history, target_session_id, chat_name, bar, gr.update(selected=0)
-
-    resume_session_btn.click(
-        fn=on_resume_session,
-        inputs=[resume_session_input, user_state],
-        outputs=[chatbot, session_id, chat_name_st, user_bar_html, main_tabs],
+        outputs=[auth_grp, app_grp, user_st, chatbot,
+                 sidebar_out, header_out, welcome_out,
+                 chatbot, chatname_st, sessions_st, sid_st, li_msg],
     )
 
 # ── Launch ────────────────────────────────────────────────────────────────────
