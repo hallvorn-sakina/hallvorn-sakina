@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sakina — Hallvorn</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- AUTH SCREEN -->
+  <div id="authScreen" class="sk-auth">
+    <div class="sk-auth-card">
+      <!-- your logo, tabs, inputs — all real HTML inputs now -->
+      <!-- Sign in tab -->
+      <input type="email" id="liEmail" placeholder="you@example.com" />
+      <input type="password" id="liPass" placeholder="Passcode" />
+      <button onclick="doLogin()">Sign in</button>
+      <p id="liMsg"></p>
+      <!-- Register tab — same pattern -->
+    </div>
+  </div>
+
+  <!-- APP SHELL -->
+  <div id="appShell" class="sk-root" style="display:none">
+    <div class="sk-sidebar" id="skSidebar">
+      <!-- sidebar renders here via JS -->
+    </div>
+    <div class="sk-main">
+      <div class="sk-header" id="skHeader"></div>
+      <div class="sk-messages" id="skMessages">
+        <div id="welcomeScreen"></div>
+        <div id="chatArea"></div>
+      </div>
+      <div class="sk-input-wrap">
+        <div class="sk-input-box">
+          <textarea id="msgBox" placeholder="Ask Sakina anything…" rows="1"></textarea>
+          <button onclick="doSend()">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
